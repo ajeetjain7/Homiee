@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
+import api from '../services/api';
 
 const BrowseTeams = () => {
   const [teams, setTeams] = useState([]);
@@ -35,8 +35,19 @@ const BrowseTeams = () => {
         skills: selectedSkill === 'All Skills' ? '' : selectedSkill
       });
 
-      const res = await axios.get(`http://localhost:5000/api/teams?${queryParams.toString()}`);
-      setTeams(res.data);
+      const res = await api.get(`/api/teams?${queryParams.toString()}`);
+      let fetched = res.data || [];
+
+      // Exclude squads where the user is already leader or member
+      if (user?._id) {
+        fetched = fetched.filter(t => {
+          const isLeader = (t.leader?._id || t.leader) === user._id;
+          const isMember = Array.isArray(t.members) && t.members.some(m => (m?._id || m) === user._id);
+          return !isLeader && !isMember;
+        });
+      }
+
+      setTeams(fetched);
     } catch (err) {
       console.error('Error fetching teams:', err);
     }
@@ -45,23 +56,22 @@ const BrowseTeams = () => {
   useEffect(() => {
     const timer = setTimeout(fetchTeams, 300);
     return () => clearTimeout(timer);
-  }, [search, psCodeFilter, selectedTheme, selectedRole, selectedSkill]);
+  }, [search, psCodeFilter, selectedTheme, selectedRole, selectedSkill, user?._id]);
 
   const handleSendRequest = async (e) => {
     e.preventDefault();
     if (!selectedTeamForRequest) return;
 
     try {
-      await axios.post(`http://localhost:5000/api/teams/${selectedTeamForRequest._id}/request`, {
-        userId: user._id || 'user_sih_2026',
-        userName: user.name || 'Applicant',
+      await api.post(`/api/teams/${selectedTeamForRequest._id}/request`, {
         role: selectedTeamForRequest.vacancies?.[0]?.roleName || 'Contributor',
         pitchNote,
         proofOfWork: user.github || user.portfolio || ''
       });
 
-      toast.success(`Request sent to ${selectedTeamForRequest.name}!`);
+      toast.success(`🎉 Application sent to ${selectedTeamForRequest.name}!`);
       setSelectedTeamForRequest(null);
+      setPitchNote('');
       fetchTeams();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to submit request.');
@@ -256,4 +266,4 @@ const BrowseTeams = () => {
   );
 };
 
-export default BrowseTeams;
+export default BrowseTeams;

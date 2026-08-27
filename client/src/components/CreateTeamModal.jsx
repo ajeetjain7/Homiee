@@ -1,345 +1,266 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import api from '../services/api';
+
+const SIH_THEMES = [
+  'Agriculture & Rural Development',
+  'Clean & Renewable Green Technology',
+  'Cybersecurity & Disaster Management',
+  'Smart Education & Learning',
+  'Healthcare & Biomedical Devices',
+  'Smart Automation & Robotics',
+  'Fintech & Web3 Blockchain',
+  'Heritage, Culture & Tourism',
+  'Transportation & Logistics',
+  'Open Innovation / Miscellaneous'
+];
+
+const INITIAL_VACANCIES = [
+  { roleName: 'Backend Developer', count: 1, status: 'Vacant' },
+  { roleName: 'AI / ML Engineer', count: 1, status: 'Vacant' },
+  { roleName: 'PPT & Pitch Deck Designer', count: 1, status: 'Vacant' }
+];
 
 const CreateTeamModal = ({ isOpen, onClose, onSuccess }) => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-
-  const localUser = (() => {
-    try {
-      const saved = localStorage.getItem('userInfo');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  })();
-
-  const [form, setForm] = useState({
+  const [formData, setFormData] = useState({
     name: '',
     sihTheme: 'Agriculture & Rural Development',
     categoryEdition: 'Software Edition',
-    organization: '',
     psCode: '',
     problemStatementTitle: '',
+    organization: '',
     tagline: '',
-    description: ''
+    description: '',
+    vacancies: INITIAL_VACANCIES,
+    criticalSkills: [
+      { skillName: 'React', priority: 'CRITICAL' },
+      { skillName: 'PPT Making', priority: 'CRITICAL' }
+    ]
   });
 
-  const [vacancies, setVacancies] = useState([
-    { roleName: 'Backend Developer', status: 'Vacant' },
-    { roleName: 'AI/ML Engineer', status: 'Vacant' },
-    { roleName: 'UI/UX Designer', status: 'Vacant' }
-  ]);
-
-  const [selectedRoleInput, setSelectedRoleInput] = useState('IoT & Hardware Engineer');
-
-  const [criticalSkills, setCriticalSkills] = useState([
-    { skillName: 'Python', priority: 'CRITICAL' },
-    { skillName: 'React', priority: 'PREFERRED' },
-    { skillName: 'PostgreSQL', priority: 'PREFERRED' }
-  ]);
-
-  const [skillInput, setSkillInput] = useState('');
-  const [skillPriority, setSkillPriority] = useState('CRITICAL');
+  const [newVacancyRole, setNewVacancyRole] = useState('');
+  const [newSkillName, setNewSkillName] = useState('');
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
   const handleAddVacancy = () => {
-    if (!selectedRoleInput) return;
-    setVacancies([...vacancies, { roleName: selectedRoleInput, status: 'Vacant' }]);
+    if (!newVacancyRole.trim()) return;
+    setFormData({
+      ...formData,
+      vacancies: [...formData.vacancies, { roleName: newVacancyRole.trim(), count: 1, status: 'Vacant' }]
+    });
+    setNewVacancyRole('');
   };
 
-  const handleRemoveVacancy = (index) => {
-    setVacancies(vacancies.filter((_, i) => i !== index));
+  const handleRemoveVacancy = (idx) => {
+    setFormData({
+      ...formData,
+      vacancies: formData.vacancies.filter((_, i) => i !== idx)
+    });
   };
 
   const handleAddSkill = () => {
-    if (!skillInput.trim()) return;
-    setCriticalSkills([...criticalSkills, { skillName: skillInput.trim(), priority: skillPriority }]);
-    setSkillInput('');
+    if (!newSkillName.trim()) return;
+    setFormData({
+      ...formData,
+      criticalSkills: [...formData.criticalSkills, { skillName: newSkillName.trim(), priority: 'CRITICAL' }]
+    });
+    setNewSkillName('');
   };
 
-  const handleRemoveSkill = (index) => {
-    setCriticalSkills(criticalSkills.filter((_, i) => i !== index));
+  const handleRemoveSkill = (idx) => {
+    setFormData({
+      ...formData,
+      criticalSkills: formData.criticalSkills.filter((_, i) => i !== idx)
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!form.name || !form.psCode || !form.problemStatementTitle || !form.description) {
-      toast.error('Please fill in all required fields (Name, PS Code, Title, Description).');
+    if (!formData.name || !formData.psCode || !formData.problemStatementTitle || !formData.description) {
+      toast.error('Please fill in all required fields marked with *');
       return;
     }
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-
       const payload = {
-        ...form,
-        vacancies,
-        criticalSkills,
-        userId: localUser._id || 'user_sih_2026',
-        userName: localUser.name || 'Student Innovator',
-        email: localUser.email || ''
+        ...formData,
+        tagline: formData.tagline || formData.problemStatementTitle
       };
 
-      const res = await axios.post('http://localhost:5000/api/teams/create', payload, config);
+      const res = await api.post('/api/teams/create', payload);
 
-      toast.success('🎉 SIH Squad created successfully!');
+      toast.success(`🎉 Squad "${formData.name}" created successfully!`);
       onClose();
       if (onSuccess) onSuccess(res.data);
       navigate('/team');
     } catch (err) {
-      console.error('Create team error:', err);
-      toast.error(err.response?.data?.message || 'Failed to create team.');
+      console.error('Create Team Error:', err);
+      toast.error(err.response?.data?.message || 'Failed to create squad. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto font-sans">
-      <div className="bg-[#0B132B] border border-[#F59E0B]/50 rounded-3xl max-w-3xl w-full shadow-2xl relative my-8 overflow-hidden text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto select-none font-sans">
+      <div className="bg-[#0B132B] border border-amber-500/50 rounded-3xl max-w-2xl w-full p-6 md:p-8 space-y-5 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
         
-        {/* Modal Header */}
-        <div className="bg-[#050A14] border-b border-[#1E293B] px-6 py-4 flex items-center justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#F59E0B] text-black font-black flex items-center justify-center text-sm shadow-md">
-              ⚡
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-[#1E293B] pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-500 text-black font-black text-lg flex items-center justify-center">
+                ⚡
+              </div>
+              <h2 className="text-xl md:text-2xl font-black text-white">Create SIH 2026 Squad</h2>
             </div>
-            <div>
-              <h2 className="text-base font-black text-white">Create SIH 2026 Squad</h2>
-              <p className="text-[11px] text-[#94A3B8] font-mono">Define problem statement and post vacancies</p>
-            </div>
+            <p className="text-xs text-[#CBD5E1]">
+              Publish your problem statement requirements and open vacancies for students to apply.
+            </p>
           </div>
-
           <button
             onClick={onClose}
-            type="button"
-            className="w-8 h-8 rounded-xl bg-[#0F172A] border border-[#1E293B] hover:border-gray-500 text-[#CBD5E1] hover:text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer"
+            className="text-gray-400 hover:text-white text-xl font-bold p-1 cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        {/* Modal Form Content */}
-        <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 max-h-[75vh] overflow-y-auto text-xs">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           
-          {/* Section 1: Team & SIH Details */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-[#1E293B] text-sm font-bold text-white">
-              <span>🏛️</span> <span>1. Team & Problem Statement</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[#CBD5E1] mb-1 font-bold">SIH Team Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. AgriTech Pioneers"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#CBD5E1] mb-1 font-bold">SIH Theme *</label>
-                <select
-                  value={form.sihTheme}
-                  onChange={(e) => setForm({ ...form, sihTheme: e.target.value })}
-                  className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none cursor-pointer"
-                >
-                  <option value="Agriculture & Rural Development">Agriculture & Rural Development</option>
-                  <option value="MedTech & BioTech Healthcare">MedTech & BioTech Healthcare</option>
-                  <option value="Clean & Renewable Green Technology">Clean & Green Technology</option>
-                  <option value="Smart Automation, IoT & Robotics">Smart Automation & Robotics</option>
-                  <option value="Cybersecurity & Disaster Management">Cybersecurity & Disaster</option>
-                  <option value="Smart Education & Learning">Smart Education & Learning</option>
-                  <option value="Fintech & Web3 Blockchain">Fintech & Web3 Blockchain</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Category Edition Buttons */}
+          {/* Row 1: Squad Name & Theme */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-[#CBD5E1] mb-1.5 font-bold">Category Edition</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, categoryEdition: 'Software Edition' })}
-                  className={`py-2 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer ${
-                    form.categoryEdition === 'Software Edition'
-                      ? 'bg-[#261E0C] border border-[#F59E0B]/70 text-[#FBBF24]'
-                      : 'bg-[#070D18] border border-[#334155] text-[#CBD5E1]'
-                  }`}
-                >
-                  &lt;/&gt; Software Edition
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, categoryEdition: 'Hardware Edition' })}
-                  className={`py-2 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer ${
-                    form.categoryEdition === 'Hardware Edition'
-                      ? 'bg-[#261E0C] border border-[#F59E0B]/70 text-[#FBBF24]'
-                      : 'bg-[#070D18] border border-[#334155] text-[#CBD5E1]'
-                  }`}
-                >
-                  ⚙ Hardware Edition
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[#CBD5E1] mb-1 font-bold">SIH PS Code *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. SIH1420"
-                  value={form.psCode}
-                  onChange={(e) => setForm({ ...form, psCode: e.target.value })}
-                  className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[#CBD5E1] mb-1 font-bold">Ministry / Organization (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Ministry of Agriculture"
-                  value={form.organization}
-                  onChange={(e) => setForm({ ...form, organization: e.target.value })}
-                  className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[#CBD5E1] mb-1 font-bold">Problem Statement Title *</label>
+              <label className="block text-[#CBD5E1] font-bold mb-1">Squad / Team Name *</label>
               <input
                 type="text"
                 required
-                placeholder="e.g. AI-Powered Crop Disease Detection and Local Marketplace"
-                value={form.problemStatementTitle}
-                onChange={(e) => setForm({ ...form, problemStatementTitle: e.target.value })}
+                placeholder="e.g. AgroAI Champions, ByteBuilders"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-[#CBD5E1] mb-1 font-bold">Detailed Project Pitch & Tech Stack *</label>
-              <textarea
-                rows="3"
+              <label className="block text-[#CBD5E1] font-bold mb-1">SIH Official Theme *</label>
+              <select
+                value={formData.sihTheme}
+                onChange={(e) => setFormData({ ...formData, sihTheme: e.target.value })}
+                className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none cursor-pointer"
+              >
+                {SIH_THEMES.map(theme => (
+                  <option key={theme} value={theme}>{theme}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Row 2: PS Code & Category Edition */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            <div>
+              <label className="block text-[#CBD5E1] font-bold mb-1">SIH PS Code *</label>
+              <input
+                type="text"
                 required
-                placeholder="Explain the solution architecture, deliverables, and role responsibilities..."
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl p-3 text-white outline-none"
+                placeholder="e.g. SIH1420, SIH128"
+                value={formData.psCode}
+                onChange={(e) => setFormData({ ...formData, psCode: e.target.value })}
+                className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[#CBD5E1] font-bold mb-1">Category Edition</label>
+              <select
+                value={formData.categoryEdition}
+                onChange={(e) => setFormData({ ...formData, categoryEdition: e.target.value })}
+                className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none cursor-pointer"
+              >
+                <option value="Software Edition">Software Edition</option>
+                <option value="Hardware Edition">Hardware Edition</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[#CBD5E1] font-bold mb-1">Ministry / Organization</label>
+              <input
+                type="text"
+                placeholder="e.g. Ministry of Agriculture"
+                value={formData.organization}
+                onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none"
               />
             </div>
           </div>
 
-          {/* Section 2: Vacancies to Recruit */}
-          <div className="space-y-3 pt-4 border-t border-[#1E293B]">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-white text-sm">👥 2. Open Squad Vacancies</span>
-              <span className="text-[10px] font-mono text-[#FBBF24] bg-[#261E0C] border border-[#785412] px-2 py-0.5 rounded font-bold">
-                {vacancies.length + 1}/6 Members Planned
-              </span>
-            </div>
+          {/* Problem Statement Title */}
+          <div>
+            <label className="block text-[#CBD5E1] font-bold mb-1">Problem Statement Title *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. AI-driven Pest Detection and Real-time Crop Advisory"
+              value={formData.problemStatementTitle}
+              onChange={(e) => setFormData({ ...formData, problemStatementTitle: e.target.value })}
+              className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-white outline-none"
+            />
+          </div>
 
+          {/* Squad Pitch / Description */}
+          <div>
+            <label className="block text-[#CBD5E1] font-bold mb-1">Squad Description & Approach *</label>
+            <textarea
+              rows="3"
+              required
+              placeholder="Explain your approach, architecture, and what makes your squad's approach unique for SIH 2026..."
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl p-3 text-white outline-none leading-relaxed"
+            />
+          </div>
+
+          {/* Vacancy Roles Needed */}
+          <div>
+            <label className="block text-[#CBD5E1] font-bold mb-1.5 flex items-center justify-between">
+              <span>Required Role Vacancies (Looking For)</span>
+              <span className="text-[10px] text-[#94A3B8] font-mono">Max 6 Total Members</span>
+            </label>
+            
             <div className="flex gap-2">
-              <select
-                value={selectedRoleInput}
-                onChange={(e) => setSelectedRoleInput(e.target.value)}
-                className="flex-1 bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2 text-white outline-none cursor-pointer"
-              >
-                <option value="Backend Developer">Backend Developer</option>
-                <option value="Frontend Developer">Frontend Developer</option>
-                <option value="AI/ML Engineer">AI/ML Engineer</option>
-                <option value="UI/UX Designer">UI/UX Designer</option>
-                <option value="PPT & Pitch Specialist">PPT & Pitch Specialist</option>
-                <option value="IoT & Hardware Engineer">IoT & Hardware Engineer</option>
-                <option value="Cybersecurity Analyst">Cybersecurity Analyst</option>
-              </select>
-
+              <input
+                type="text"
+                placeholder="e.g. Backend Dev, PPT Specialist, UI/UX"
+                value={newVacancyRole}
+                onChange={(e) => setNewVacancyRole(e.target.value)}
+                className="flex-1 bg-[#070D18] border border-[#334155] rounded-xl px-3.5 py-2 text-white outline-none"
+              />
               <button
                 type="button"
                 onClick={handleAddVacancy}
-                className="bg-[#0F172A] hover:bg-[#1E293B] border border-[#334155] text-white px-4 py-2 rounded-xl font-bold cursor-pointer transition-all"
+                className="bg-amber-500 hover:bg-amber-400 text-black font-black text-xs px-4 py-2 rounded-xl transition-all cursor-pointer"
               >
                 + Add Vacancy
               </button>
             </div>
 
-            <div className="space-y-2 pt-1">
-              <div className="bg-[#17130A] border border-[#F59E0B]/50 p-2.5 rounded-xl flex items-center justify-between text-xs">
-                <span className="font-bold text-white">👑 {localUser.name || 'You'} (Squad Leader)</span>
-                <span className="text-[10px] font-mono text-[#FBBF24] bg-[#261E0C] px-2 py-0.5 rounded font-bold">Filled</span>
-              </div>
-
-              {vacancies.map((v, idx) => (
-                <div key={idx} className="bg-[#070D18] border border-[#1E293B] p-2.5 rounded-xl flex items-center justify-between text-xs">
-                  <span className="text-[#CBD5E1]">⚠️ {v.roleName} (1 Vacancy)</span>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {formData.vacancies.map((v, idx) => (
+                <span
+                  key={idx}
+                  className="bg-[#17130A] border border-[#F59E0B]/60 text-[#FBBF24] text-xs font-mono px-3 py-1 rounded-xl flex items-center gap-2"
+                >
+                  <span>⚠️ {v.roleName}</span>
                   <button
                     type="button"
                     onClick={() => handleRemoveVacancy(idx)}
-                    className="text-rose-400 hover:text-rose-300 px-2 py-0.5 rounded text-xs cursor-pointer"
-                  >
-                    🗑️ Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Section 3: Critical Skills */}
-          <div className="space-y-3 pt-4 border-t border-[#1E293B]">
-            <span className="font-bold text-white text-sm block">⚡ 3. Critical Technical Skills</span>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="e.g. PyTorch, React, Canva..."
-                value={skillInput}
-                onChange={(e) => setSkillInput(e.target.value)}
-                className="flex-1 bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2 text-white outline-none"
-              />
-              <select
-                value={skillPriority}
-                onChange={(e) => setSkillPriority(e.target.value)}
-                className="bg-[#070D18] border border-[#334155] rounded-xl px-3 py-2 text-white outline-none cursor-pointer"
-              >
-                <option value="CRITICAL">CRITICAL</option>
-                <option value="PREFERRED">PREFERRED</option>
-              </select>
-              <button
-                type="button"
-                onClick={handleAddSkill}
-                className="bg-[#0F172A] hover:bg-[#1E293B] border border-[#334155] text-white px-4 py-2 rounded-xl font-bold cursor-pointer transition-all"
-              >
-                + Add Skill
-              </button>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {criticalSkills.map((sk, idx) => (
-                <span
-                  key={idx}
-                  className="bg-[#070D18] border border-[#334155] text-[#CBD5E1] text-[11px] font-mono px-2.5 py-1 rounded-lg flex items-center gap-1.5"
-                >
-                  <span className={sk.priority === 'CRITICAL' ? 'text-amber-400 font-bold' : 'text-cyan-400'}>
-                    ● {sk.skillName}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveSkill(idx)}
-                    className="text-gray-500 hover:text-rose-400 cursor-pointer ml-1"
+                    className="text-[#94A3B8] hover:text-rose-400 cursor-pointer font-bold"
                   >
                     ✕
                   </button>
@@ -348,21 +269,60 @@ const CreateTeamModal = ({ isOpen, onClose, onSuccess }) => {
             </div>
           </div>
 
-          {/* Modal Footer Buttons */}
-          <div className="pt-6 border-t border-[#1E293B] flex items-center justify-end gap-3 sticky bottom-0 bg-[#0B132B] pb-2">
+          {/* Critical Skills */}
+          <div>
+            <label className="block text-[#CBD5E1] font-bold mb-1.5">Critical Tech Skills Needed</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="e.g. React, PyTorch, Canva, Docker"
+                value={newSkillName}
+                onChange={(e) => setNewSkillName(e.target.value)}
+                className="flex-1 bg-[#070D18] border border-[#334155] rounded-xl px-3.5 py-2 text-white outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddSkill}
+                className="bg-[#0F172A] border border-[#334155] text-white font-bold text-xs px-4 py-2 rounded-xl hover:bg-[#1E293B] cursor-pointer"
+              >
+                + Add Skill
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-2">
+              {formData.criticalSkills.map((s, idx) => (
+                <span
+                  key={idx}
+                  className="bg-[#070D18] border border-[#334155] text-[#CBD5E1] text-xs font-mono px-3 py-1 rounded-xl flex items-center gap-2"
+                >
+                  <span>⚡ {s.skillName}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSkill(idx)}
+                    className="text-[#94A3B8] hover:text-rose-400 cursor-pointer font-bold"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1E293B]">
             <button
               type="button"
               onClick={onClose}
-              className="bg-[#0F172A] hover:bg-[#1E293B] border border-[#334155] text-[#CBD5E1] font-bold text-xs px-5 py-3 rounded-xl transition-all cursor-pointer"
+              className="bg-[#070D18] hover:bg-[#0B132B] border border-[#334155] text-[#CBD5E1] font-bold px-5 py-2.5 rounded-xl cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs px-8 py-3 rounded-xl transition-all shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs px-6 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-50"
             >
-              {loading ? 'Publishing Squad...' : '⚡ Publish Squad & Open Roster'}
+              {loading ? 'Publishing Squad...' : '⚡ Form Squad & Open Vacancies'}
             </button>
           </div>
 
@@ -374,4 +334,3 @@ const CreateTeamModal = ({ isOpen, onClose, onSuccess }) => {
 };
 
 export default CreateTeamModal;
-

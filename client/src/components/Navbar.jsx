@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import CreateTeamModal from './CreateTeamModal';
 
 const Navbar = ({ user: propUser, onOpenSetup }) => {
@@ -19,7 +19,7 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
 
   const token = localStorage.getItem('token');
   const user = propUser || localUser;
-  const isAuthenticated = Boolean(user && (token || user._id));
+  const isAuthenticated = Boolean(user && token);
   const userInitials = user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'IN';
 
   // Live polling for unread incoming invitations count
@@ -28,11 +28,7 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
 
     const fetchCount = async () => {
       try {
-        const config = {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          params: { userId: user._id, email: user.email, userName: user.name }
-        };
-        const res = await axios.get('http://localhost:5000/api/requests/incoming', config);
+        const res = await api.get('/api/requests/incoming');
         if (Array.isArray(res.data)) {
           setUnreadCount(res.data.length);
         }
@@ -42,9 +38,9 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
     };
 
     fetchCount();
-    const interval = setInterval(fetchCount, 10000);
+    const interval = setInterval(fetchCount, 12000);
     return () => clearInterval(interval);
-  }, [user?._id, user?.email, user?.name, isAuthenticated, token]);
+  }, [user?._id, user?.email, user?.name, isAuthenticated]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -87,7 +83,7 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
             to="/team" 
             className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-[#CBD5E1] hover:text-white transition-colors'}
           >
-            Team
+            My Squad
           </NavLink>
           {isAuthenticated && (
             <NavLink 
@@ -108,7 +104,7 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
                 onClick={() => setShowCreateModal(true)}
                 className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
               >
-                <span>+</span> Create Team
+                <span>+</span> Create Squad
               </button>
 
               {user && !user.isProfileComplete && !user.profileComplete && onOpenSetup && (

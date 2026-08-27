@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { loginWithGoogle } from '../services/firebase';
+import api from '../services/api';
 
 const Login = () => {
   const [searchParams] = useSearchParams();
@@ -21,7 +21,7 @@ const Login = () => {
     }
   }, [searchParams]);
 
-  // Google OAuth Handler (Direct Firebase Google Sign-In with MongoDB Profile Sync)
+  // Google OAuth Handler (Direct Firebase Google Sign-In with Backend Cryptographic Token Sync)
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
@@ -36,7 +36,7 @@ const Login = () => {
         avatar: gUser.photoURL || ''
       };
 
-      const res = await axios.post('http://localhost:5000/api/auth/google', payload);
+      const res = await api.post('/api/auth/google', payload);
 
       localStorage.setItem('token', res.data.token || fbToken);
       localStorage.setItem('userInfo', JSON.stringify(res.data));
@@ -71,12 +71,9 @@ const Login = () => {
 
     setLoading(true);
     try {
-      const endpoint = isSignUp 
-        ? 'http://localhost:5000/api/auth/register' 
-        : 'http://localhost:5000/api/auth/login';
-
+      const endpoint = isSignUp ? '/api/auth/register' : '/api/auth/login';
       const payload = isSignUp ? { name, email, password } : { email, password };
-      const res = await axios.post(endpoint, payload);
+      const res = await api.post(endpoint, payload);
 
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('userInfo', JSON.stringify(res.data));
@@ -94,60 +91,6 @@ const Login = () => {
       toast.error(err.response?.data?.message || 'Authentication failed. Please check credentials.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Instant Demo Login for Offline Testing
-  const handleDemoLogin = (isNew = true) => {
-    if (isNew) {
-      const newUser = {
-        _id: 'user_' + Date.now(),
-        name: 'Aryan Sharma',
-        email: 'aryan.sharma2026@gmail.com',
-        college: '',
-        classBranch: '',
-        section: '',
-        year: '3rd Year',
-        gender: 'Male',
-        primaryRole: 'Fullstack Developer',
-        capabilities: ['PPT Making & Pitch Deck', 'Backend & APIs'],
-        technicalSkills: ['React', 'PPT Making', 'Node.js', 'MongoDB'],
-        sihThemes: ['Clean & Renewable Green Technology'],
-        about: '',
-        profileComplete: false,
-        isProfileComplete: false,
-        sihReadinessScore: 20
-      };
-      localStorage.setItem('token', 'demo_jwt_token_new');
-      localStorage.setItem('userInfo', JSON.stringify(newUser));
-      navigate('/teammates', { state: { openSetup: true } });
-    } else {
-      const existingUser = {
-        _id: 'user_sih_2026',
-        name: 'Vikramaditya Rathore',
-        email: 'vikram.sih2026@gmail.com',
-        college: 'IET DAVV, Indore',
-        classBranch: 'B.Tech Computer Science & Engineering',
-        section: 'Section B',
-        year: '3rd Year',
-        yearAndBranch: '3rd Year • B.Tech CSE (Section B)',
-        gender: 'Male',
-        primaryRole: 'Fullstack Developer',
-        capabilities: ['PPT Making & Pitch Deck', 'Frontend UI / UX', 'Backend & APIs'],
-        technicalSkills: ['React', 'Node.js', 'MongoDB', 'PPT Making', 'Canva', 'TailwindCSS'],
-        sihThemes: ['Agriculture & Rural Development', 'Smart Education & Learning'],
-        about: 'Passionate fullstack engineer & pitch presentation designer. 3 hackathons won, looking for enthusiastic teammates for SIH 2026.',
-        github: 'https://github.com/vikram-rathore',
-        linkedin: 'https://linkedin.com/in/vikram-rathore',
-        portfolio: 'https://vikramaditya.dev',
-        leetcodeRating: '1920 (Knight)',
-        profileComplete: true,
-        isProfileComplete: true,
-        sihReadinessScore: 90
-      };
-      localStorage.setItem('token', 'demo_jwt_token_existing');
-      localStorage.setItem('userInfo', JSON.stringify(existingUser));
-      navigate('/teammates');
     }
   };
 
@@ -339,31 +282,10 @@ const Login = () => {
                 </button>
               </form>
 
-              {/* Instant Demo Login Buttons */}
-              <div className="pt-2 border-t border-[#1E293B] space-y-2">
-                <span className="block text-[10px] font-mono text-center text-[#94A3B8] uppercase">QUICK DEMO ACCESS:</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin(true)}
-                    className="bg-[#17130A] border border-[#F59E0B]/60 hover:border-[#F59E0B] text-[#FBBF24] font-mono font-bold text-[10px] py-2 px-2.5 rounded-xl transition-all text-center cursor-pointer"
-                  >
-                    ⚡ New Innovator (Setup)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin(false)}
-                    className="bg-[#070D18] border border-[#334155] hover:border-gray-400 text-[#CBD5E1] font-mono font-bold text-[10px] py-2 px-2.5 rounded-xl transition-all text-center cursor-pointer"
-                  >
-                    👤 Existing Member
-                  </button>
-                </div>
-              </div>
-
               {/* Terms Links */}
               <div className="text-center pt-1">
                 <p className="text-[11px] text-[#94A3B8]">
-                  By continuing, you agree to our <a href="#terms" className="text-[#F59E0B] font-semibold hover:underline">Terms of Service</a> & <a href="#privacy" className="text-[#F59E0B] font-semibold hover:underline">Privacy Policy</a>.
+                  By continuing, you agree to our <span className="text-[#F59E0B] font-semibold">Terms of Service</span> & <span className="text-[#F59E0B] font-semibold">Privacy Policy</span>.
                 </p>
               </div>
 
@@ -386,4 +308,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Login;

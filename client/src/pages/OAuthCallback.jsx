@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
 import toast from 'react-hot-toast';
+import api from '../services/api';
 
 const OAuthCallback = () => {
   const [searchParams] = useSearchParams();
@@ -29,9 +29,7 @@ const OAuthCallback = () => {
 
           // Fetch fresh user profile from /api/auth/me
           try {
-            const meRes = await axios.get('http://localhost:5000/api/auth/me', {
-              headers: { Authorization: `Bearer ${token}` }
-            });
+            const meRes = await api.get('/api/auth/me');
             if (meRes.data) {
               currentUser = meRes.data;
               localStorage.setItem('userInfo', JSON.stringify(currentUser));
@@ -80,4 +78,3 @@ const OAuthCallback = () => {
 };
 
 export default OAuthCallback;
-

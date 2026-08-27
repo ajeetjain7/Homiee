@@ -13,13 +13,11 @@ import OnboardingModal from './components/OnboardingModal';
 import BrowseTeams from './pages/BrowseTeams';
 import FindTeammates from './pages/FindTeammates';
 import MyTeam from './pages/MyTeam';
-import DashboardTeam from './pages/Dashboard';
 import CreateTeam from './pages/CreateTeam';
 import Requests from './pages/Requests';
 import Profile from './pages/Profile';
 
 function AppLayout({ children }) {
-  const location = useLocation();
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('userInfo');
@@ -44,7 +42,6 @@ function AppLayout({ children }) {
   const handleProfileComplete = (updatedUser) => {
     setCurrentUser(updatedUser);
     setShowOnboarding(false);
-    // Clear location state so openSetup never re-triggers onboarding modal
     if (window.history.replaceState) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -169,11 +166,22 @@ function App() {
         />
 
         <Route 
+          path="/create-team" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <CreateTeam />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
           path="/teams/:id" 
           element={
             <ProtectedRoute>
               <AppLayout>
-                <DashboardTeam />
+                <MyTeam />
               </AppLayout>
             </ProtectedRoute>
           } 
@@ -181,11 +189,11 @@ function App() {
 
         {/* Route Aliases for Seamless Navigation */}
         <Route path="/my-team" element={<Navigate to="/team" replace />} />
-        <Route path="/form-team" element={<Navigate to="/team" replace />} />
+        <Route path="/form-team" element={<Navigate to="/create-team" replace />} />
         <Route path="/dashboard/my-team" element={<Navigate to="/team" replace />} />
         <Route path="/dashboard/browse" element={<Navigate to="/teams" replace />} />
         <Route path="/dashboard/teammates" element={<Navigate to="/teammates" replace />} />
-        <Route path="/dashboard/create" element={<Navigate to="/team" replace />} />
+        <Route path="/dashboard/create" element={<Navigate to="/create-team" replace />} />
         <Route path="/dashboard/requests" element={<Navigate to="/requests" replace />} />
         <Route path="/dashboard/profile" element={<Navigate to="/profile" replace />} />
         <Route path="/dashboard" element={<Navigate to="/teams" replace />} />

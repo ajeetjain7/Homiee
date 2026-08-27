@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState } from 'react';
 import toast from 'react-hot-toast';
+import api from '../services/api';
 
 const POPULAR_CAPABILITIES = [
   'PPT Making & Pitch Deck',
@@ -34,14 +34,13 @@ const Profile = ({ onUpdateUser }) => {
     try {
       const saved = localStorage.getItem('userInfo');
       return saved ? JSON.parse(saved) : {
-        _id: 'user_sih_2026',
-        name: 'Vikramaditya Rathore',
-        email: 'vikram.sih2026@gmail.com',
-        college: 'IET DAVV, Indore',
-        classBranch: 'B.Tech Computer Science & Engineering',
-        section: 'Section B',
+        name: 'Student Innovator',
+        email: 'innovator@sih.edu',
+        college: 'Institute of Engineering & Tech',
+        classBranch: 'Computer Science & Engineering',
+        section: 'Section A',
         year: '3rd Year',
-        yearAndBranch: '3rd Year • Computer Science (Section B)',
+        yearAndBranch: '3rd Year • Computer Science (Section A)',
         gender: 'Male',
         primaryRole: 'Fullstack Developer',
         capabilities: ['PPT Making & Pitch Deck', 'Frontend UI / UX', 'Backend & APIs'],
@@ -50,25 +49,23 @@ const Profile = ({ onUpdateUser }) => {
         featuredProjects: [],
         sihThemes: ['Agriculture & Rural Development', 'Smart Education & Learning'],
         about: 'Passionate fullstack engineer & pitch presentation designer. Ready to build winning solutions for SIH 2026.',
-        github: 'https://github.com/vikram-rathore',
-        linkedin: 'https://linkedin.com/in/vikram-rathore',
-        portfolio: 'https://vikramaditya.dev',
-        leetcodeRating: '1920 (Knight)',
-        hackathonsCount: 2,
+        github: '',
+        linkedin: '',
+        portfolio: '',
+        leetcodeRating: 'N/A',
         isProfileComplete: true
       };
     } catch {
-      return { _id: 'user_sih_2026', name: 'Vikramaditya Rathore', email: 'vikram.sih2026@gmail.com' };
+      return { name: 'Student Innovator', email: 'innovator@sih.edu' };
     }
   });
 
   const [form, setForm] = useState(user);
   const [newSkill, setNewSkill] = useState('');
-  const [newProject, setNewProject] = useState({ title: '', link: '', description: '' });
 
-  // Calculate Readiness Percentage dynamically based on profile completeness
+  // Calculate Readiness Percentage dynamically
   const calculateReadiness = () => {
-    let score = 25; // Base score
+    let score = 25;
     if (user.technicalSkills && user.technicalSkills.length >= 3) score += 25;
     if (user.capabilities && user.capabilities.length > 0) score += 15;
     if (user.sihThemes && user.sihThemes.length > 0) score += 15;
@@ -82,20 +79,22 @@ const Profile = ({ onUpdateUser }) => {
   const handleSaveProfile = async () => {
     try {
       const payload = {
-        userId: user._id,
         ...form,
         isProfileComplete: true,
         yearAndBranch: `${form.year || '3rd Year'} • ${form.classBranch || 'Computer Science'}${form.section ? ` (${form.section})` : ''}`
       };
 
-      const res = await axios.put('http://localhost:5000/api/auth/profile', payload);
+      const res = await api.put('/api/auth/profile', payload);
       setUser(res.data);
       localStorage.setItem('userInfo', JSON.stringify(res.data));
+      if (res.data.token) {
+        localStorage.setItem('token', res.data.token);
+      }
       if (onUpdateUser) onUpdateUser(res.data);
       setIsEditing(false);
       toast.success('🎉 Profile & Teammate Card updated successfully!');
     } catch (err) {
-      console.warn('Backend unavailable, saving locally:', err);
+      console.warn('Backend note, saving locally:', err);
       const updated = {
         ...form,
         isProfileComplete: true,
@@ -130,21 +129,7 @@ const Profile = ({ onUpdateUser }) => {
     setForm({ ...form, capabilities: updated });
   };
 
-  const toggleFormTheme = (theme) => {
-    const themes = form.sihThemes || [];
-    const exists = themes.includes(theme);
-    const updated = exists ? themes.filter(t => t !== theme) : [...themes, theme];
-    setForm({ ...form, sihThemes: updated });
-  };
-
-  const handleAddProject = () => {
-    if (!newProject.title.trim()) return;
-    const updatedProjects = [...(form.featuredProjects || []), newProject];
-    setForm({ ...form, featuredProjects: updatedProjects });
-    setNewProject({ title: '', link: '', description: '' });
-  };
-
-  const userInitials = user.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'VR';
+  const userInitials = user.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'IN';
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto font-sans text-white select-none">
@@ -230,50 +215,7 @@ const Profile = ({ onUpdateUser }) => {
         </div>
       </div>
 
-      {/* 2. SIH Profile Readiness Indicator */}
-      <div className="bg-[#0B132B]/90 border border-gray-800 rounded-2xl p-6 shadow-xl space-y-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="text-base">📈</span>
-            <h3 className="text-sm font-bold text-white tracking-wide">SIH Teammate Readiness</h3>
-            <span className="bg-[#261E0C] border border-[#785412] text-[#FBBF24] text-[10px] font-mono font-bold px-2.5 py-0.5 rounded">
-              {readinessScore}% COMPLETE
-            </span>
-          </div>
-        </div>
-
-        <div className="w-full bg-[#070D18] h-2 rounded-full overflow-hidden border border-gray-800">
-          <div 
-            className="bg-gradient-to-r from-amber-500 to-orange-500 h-full transition-all duration-500 rounded-full"
-            style={{ width: `${readinessScore}%` }}
-          />
-        </div>
-
-        {/* Action Checkpoints */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-          <div className={`p-3 rounded-xl border text-xs font-mono flex items-center gap-2 ${user.technicalSkills?.length >= 3 ? 'bg-[#0E3A2F] border-[#059669]/40 text-[#34D399]' : 'bg-[#070D18] border-gray-800 text-gray-400'}`}>
-            <span>{user.technicalSkills?.length >= 3 ? '✓' : '⏱'}</span>
-            <span>3+ Technical Skills</span>
-          </div>
-
-          <div className={`p-3 rounded-xl border text-xs font-mono flex items-center gap-2 ${user.capabilities?.length > 0 ? 'bg-[#0E3A2F] border-[#059669]/40 text-[#34D399]' : 'bg-[#070D18] border-gray-800 text-gray-400'}`}>
-            <span>{user.capabilities?.length > 0 ? '✓' : '⏱'}</span>
-            <span>PPT / Tech Roles</span>
-          </div>
-
-          <div className={`p-3 rounded-xl border text-xs font-mono flex items-center gap-2 ${user.sihThemes?.length > 0 ? 'bg-[#0E3A2F] border-[#059669]/40 text-[#34D399]' : 'bg-[#070D18] border-gray-800 text-gray-400'}`}>
-            <span>{user.sihThemes?.length > 0 ? '✓' : '⏱'}</span>
-            <span>SIH Themes Added</span>
-          </div>
-
-          <div className={`p-3 rounded-xl border text-xs font-mono flex items-center gap-2 ${user.about?.length > 15 ? 'bg-[#0E3A2F] border-[#059669]/40 text-[#34D399]' : 'bg-[#070D18] border-gray-800 text-gray-400'}`}>
-            <span>{user.about?.length > 15 ? '✓' : '⚪'}</span>
-            <span>About Pitch Bio</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Capabilities, About & Credentials Grid */}
+      {/* 2. Capabilities, About & Credentials Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* Squad Capabilities Card */}
@@ -299,7 +241,7 @@ const Profile = ({ onUpdateUser }) => {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-gray-500 italic">No capabilities selected. Add PPT making, frontend, or backend capabilities.</p>
+            <p className="text-xs text-gray-500 italic">No capabilities selected.</p>
           )}
         </div>
 
@@ -317,7 +259,7 @@ const Profile = ({ onUpdateUser }) => {
 
       </div>
 
-      {/* 4. Skills & Credentials Row */}
+      {/* 3. Skills & Credentials Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* Skills & Proficiency Card */}
@@ -371,26 +313,6 @@ const Profile = ({ onUpdateUser }) => {
 
       </div>
 
-      {/* 5. Interested SIH Themes Section */}
-      <div className="bg-[#0B132B]/90 border border-gray-800 rounded-2xl p-6 shadow-xl space-y-4">
-        <div className="flex items-center gap-2 pb-3 border-b border-gray-800/80">
-          <span className="text-rose-400">🎯</span>
-          <h3 className="text-sm font-bold text-white tracking-wide">Target SIH Themes</h3>
-        </div>
-
-        {user.sihThemes && user.sihThemes.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {user.sihThemes.map((t, idx) => (
-              <span key={idx} className="bg-[#261E0C] border border-[#785412] text-[#FBBF24] text-xs font-mono font-semibold px-3 py-1.5 rounded-lg">
-                {t}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-gray-500 italic">No themes selected yet.</p>
-        )}
-      </div>
-
       {/* Edit Profile Full Modal */}
       {isEditing && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -400,7 +322,7 @@ const Profile = ({ onUpdateUser }) => {
                 <h3 className="text-lg font-bold text-white">Edit Full Profile & Teammate Card</h3>
                 <p className="text-xs font-mono text-gray-400">Updates will be instantly published to the Find Teammates directory.</p>
               </div>
-              <button onClick={() => setIsEditing(false)} className="text-gray-400 hover:text-white text-lg">✕</button>
+              <button onClick={() => setIsEditing(false)} className="text-gray-400 hover:text-white text-lg cursor-pointer">✕</button>
             </div>
 
             <div className="space-y-4 text-xs">
@@ -542,13 +464,13 @@ const Profile = ({ onUpdateUser }) => {
                     onChange={(e) => setNewSkill(e.target.value)}
                     className="flex-1 bg-[#070D18] border border-gray-700 rounded-xl px-3 py-2 text-white outline-none"
                   />
-                  <button type="button" onClick={handleAddSkill} className="bg-amber-500 text-black font-bold px-4 rounded-xl">+ Add</button>
+                  <button type="button" onClick={handleAddSkill} className="bg-amber-500 text-black font-bold px-4 rounded-xl cursor-pointer">+ Add</button>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-2">
                   {form.technicalSkills?.map((s, i) => (
                     <span key={i} className="bg-[#0E3A2F] text-[#34D399] border border-[#059669]/40 text-[11px] px-2 py-0.5 rounded-lg flex items-center gap-1 font-mono">
                       {s}
-                      <button type="button" onClick={() => handleRemoveSkill(s)} className="text-gray-400 hover:text-rose-400">✕</button>
+                      <button type="button" onClick={() => handleRemoveSkill(s)} className="text-gray-400 hover:text-rose-400 cursor-pointer">✕</button>
                     </span>
                   ))}
                 </div>

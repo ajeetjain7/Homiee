@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import toast from 'react-hot-toast';
+import api from '../services/api';
 
 const Requests = () => {
   const [tab, setTab] = useState('received');
-  const [incomingInvites, setIncomingInvites] = useState([]);
-  const [incomingTeamRequests, setIncomingTeamRequests] = useState([]);
+  const [incomingRequests, setIncomingRequests] = useState([]);
   const [sentRequests, setSentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
@@ -20,56 +19,25 @@ const Requests = () => {
     }
   })();
 
-  const token = localStorage.getItem('token');
-
-  // Fetch all incoming requests and invitations
+  // Fetch all incoming and sent requests
   const fetchAllRequests = useCallback(async () => {
-    if (!user?._id && !user?.email && !user?.name) {
+    if (!user?._id && !user?.email) {
       setLoading(false);
       return;
     }
 
     try {
-      const config = {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        params: {
-          userId: user._id,
-          email: user.email,
-          userName: user.name
-        }
-      };
-
-      // 1. Fetch direct invitations sent to this user from /api/requests/incoming
+      // 1. Fetch incoming requests
       try {
-        const res = await axios.get('http://localhost:5000/api/requests/incoming', config);
-        console.log('📌 [LOG POINT 4: FRONTEND RECEIVED INCOMING REQUESTS]:', res.data);
-        setIncomingInvites(Array.isArray(res.data) ? res.data : []);
+        const res = await api.get('/api/requests/incoming');
+        setIncomingRequests(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.warn('Could not fetch /api/requests/incoming:', err);
       }
 
-      // 2. Fetch applications sent to teams led by this user from /api/teams
+      // 2. Fetch sent requests
       try {
-        const teamsRes = await axios.get('http://localhost:5000/api/teams/team', config);
-        const mySquads = teamsRes.data?.teams || (teamsRes.data?.team ? [teamsRes.data.team] : []);
-        const pendingSquadReqs = mySquads.flatMap(t => 
-          (t.requests || []).filter(r => r.status === 'pending').map(r => ({
-            ...r,
-            teamId: t._id,
-            teamName: t.name,
-            psCode: t.psCode,
-            isTeamApplication: true
-          }))
-        );
-        setIncomingTeamRequests(pendingSquadReqs);
-      } catch (err) {
-        console.warn('Could not fetch team applicant requests:', err);
-      }
-
-      // 3. Fetch sent requests from /api/requests/sent
-      try {
-        const sentRes = await axios.get('http://localhost:5000/api/requests/sent', config);
-        console.log('🚀 [Requests.jsx] Sent requests received from /api/requests/sent:', sentRes.data);
+        const sentRes = await api.get('/api/requests/sent');
         setSentRequests(Array.isArray(sentRes.data) ? sentRes.data : []);
       } catch (err) {
         console.warn('Could not fetch /api/requests/sent:', err);
@@ -79,15 +47,15 @@ const Requests = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?._id, user?.email, user?.name, token]);
+  }, [user?._id, user?.email]);
 
   useEffect(() => {
     fetchAllRequests();
 
-    // Auto-refetch on window focus or visibility change
+    // Auto-refetch on window focus or 8s interval
     const onFocus = () => fetchAllRequests();
     window.addEventListener('focus', onFocus);
-    const interval = setInterval(fetchAllRequests, 8000); // 8s live polling
+    const interval = setInterval(fetchAllRequests, 8000);
 
     return () => {
       window.removeEventListener('focus', onFocus);
@@ -95,43 +63,25 @@ const Requests = () => {
     };
   }, [fetchAllRequests]);
 
-  // Accept or reject an incoming direct invitation
-  const handleInviteAction = async (requestId, action) => {
+  // Accept or reject an incoming invitation / request
+  const handleAction = async (requestId, action) => {
     setActionLoading(prev => ({ ...prev, [requestId]: true }));
     try {
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      const res = await axios.patch(`http://localhost:5000/api/requests/${requestId}`, { action }, config);
+      const res = await api.patch(`/api/requests/${requestId}`, { action });
 
       if (action === 'accept') {
-        toast.success(`🎉 Invitation accepted! You are now part of ${res.data?.request?.teamName || 'the squad'}.`);
+        toast.success(res.data?.message || '🎉 Successfully accepted!');
       } else {
-        toast.success('Invitation declined.');
+        toast.success('Request declined.');
       }
       fetchAllRequests();
     } catch (err) {
       console.error('Action error:', err);
-      toast.error(err.response?.data?.message || `Failed to ${action} invitation.`);
+      toast.error(err.response?.data?.message || `Failed to ${action} request.`);
     } finally {
       setActionLoading(prev => ({ ...prev, [requestId]: false }));
     }
   };
-
-  // Accept or reject a team applicant request
-  const handleTeamApplicantAction = async (teamId, requestId, action) => {
-    setActionLoading(prev => ({ ...prev, [requestId]: true }));
-    try {
-      const res = await axios.post(`http://localhost:5000/api/teams/${teamId}/request/${requestId}/action`, { action });
-      toast.success(res.data?.message || `Applicant request ${action}ed!`);
-      fetchAllRequests();
-    } catch (err) {
-      console.error('Applicant action error:', err);
-      toast.error(err.response?.data?.message || 'Failed to process action.');
-    } finally {
-      setActionLoading(prev => ({ ...prev, [requestId]: false }));
-    }
-  };
-
-  const allIncoming = [...incomingInvites, ...incomingTeamRequests];
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto font-sans text-[#F8FAFC] select-none pb-12">
@@ -164,14 +114,7 @@ const Requests = () => {
               : 'bg-[#0B132B] text-[#CBD5E1] hover:text-white border border-[#1E293B]'
           }`}
         >
-          <span>📬 Received Invitations</span>
-          {allIncoming.length > 0 && (
-            <span className={`text-[10px] font-mono font-black px-1.5 py-0.2 rounded-full ${
-              tab === 'received' ? 'bg-black text-[#F59E0B]' : 'bg-[#F59E0B] text-black'
-            }`}>
-              {allIncoming.length}
-            </span>
-          )}
+          <span>📬 Received ({incomingRequests.length})</span>
         </button>
 
         <button
@@ -182,14 +125,7 @@ const Requests = () => {
               : 'bg-[#0B132B] text-[#CBD5E1] hover:text-white border border-[#1E293B]'
           }`}
         >
-          <span>🚀 Sent Requests & Invites</span>
-          {sentRequests.length > 0 && (
-            <span className={`text-[10px] font-mono font-black px-1.5 py-0.2 rounded-full ${
-              tab === 'sent' ? 'bg-black text-[#F59E0B]' : 'bg-[#334155] text-white'
-            }`}>
-              {sentRequests.length}
-            </span>
-          )}
+          <span>🚀 Sent ({sentRequests.length})</span>
         </button>
       </div>
 
@@ -204,12 +140,12 @@ const Requests = () => {
       {/* Tab 1: RECEIVED INVITATIONS & APPLICATIONS */}
       {!loading && tab === 'received' && (
         <div className="space-y-4">
-          {allIncoming.length === 0 ? (
+          {incomingRequests.length === 0 ? (
             <div className="bg-[#0B132B] border border-[#1E293B] rounded-3xl p-12 text-center space-y-3">
               <div className="text-4xl">📭</div>
               <h3 className="text-lg font-black text-white">No Pending Invitations</h3>
               <p className="text-xs text-[#CBD5E1] max-w-md mx-auto leading-relaxed">
-                You don't have any incoming squad invitations right now. Complete your profile in <Link to="/profile" className="text-amber-400 underline font-bold">Profile Settings</Link> to be discovered by team leaders, or explore open squads.
+                You don't have any incoming squad invitations or join requests right now. Complete your profile in <Link to="/profile" className="text-amber-400 underline font-bold">Profile Settings</Link> to be discovered by team leaders, or explore open squads.
               </p>
               <div className="pt-2 flex items-center justify-center gap-3">
                 <Link
@@ -227,8 +163,8 @@ const Requests = () => {
               </div>
             </div>
           ) : (
-            allIncoming.map((item) => {
-              const isDirectInvite = !item.isTeamApplication;
+            incomingRequests.map((item) => {
+              const isDirectInvite = item.type === 'invite';
               const isActionInProgress = actionLoading[item._id];
 
               return (
@@ -257,7 +193,7 @@ const Requests = () => {
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg font-black text-white">
-                        {isDirectInvite ? item.teamName : item.userName}
+                        {isDirectInvite ? item.teamName : item.fromUserName}
                       </h3>
                       {isDirectInvite && (
                         <span className="text-xs text-[#CBD5E1] font-mono">
@@ -276,6 +212,12 @@ const Requests = () => {
                         "{item.message || item.pitchNote}"
                       </div>
                     )}
+
+                    {item.proofOfWork && (
+                      <p className="text-[11px] font-mono text-cyan-400 pt-1">
+                        🔗 Proof of Work: <a href={item.proofOfWork} target="_blank" rel="noreferrer" className="underline">{item.proofOfWork}</a>
+                      </p>
+                    )}
                   </div>
 
                   {/* Actions */}
@@ -286,11 +228,7 @@ const Requests = () => {
 
                     <div className="flex items-center gap-2.5">
                       <button
-                        onClick={() => 
-                          isDirectInvite
-                            ? handleInviteAction(item._id, 'accept')
-                            : handleTeamApplicantAction(item.teamId, item._id, 'accept')
-                        }
+                        onClick={() => handleAction(item._id, 'accept')}
                         disabled={isActionInProgress}
                         className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs px-4 py-2 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-1.5"
                       >
@@ -298,11 +236,7 @@ const Requests = () => {
                       </button>
 
                       <button
-                        onClick={() => 
-                          isDirectInvite
-                            ? handleInviteAction(item._id, 'reject')
-                            : handleTeamApplicantAction(item.teamId, item._id, 'reject')
-                        }
+                        onClick={() => handleAction(item._id, 'reject')}
                         disabled={isActionInProgress}
                         className="bg-[#070D18] hover:bg-rose-950/50 border border-[#334155] hover:border-rose-700/50 text-[#CBD5E1] hover:text-rose-300 font-bold text-xs px-3.5 py-2 rounded-xl transition-all cursor-pointer"
                       >
@@ -366,7 +300,7 @@ const Requests = () => {
                 <div className="space-y-1">
                   <h4 className="font-bold text-white text-base">{req.teamName} ({req.psCode || 'SIH2026'})</h4>
                   <p className="text-xs text-[#CBD5E1]">
-                    Invited for Role: <span className="text-amber-400 font-bold">{req.role}</span>
+                    Role: <span className="text-amber-400 font-bold">{req.role}</span>
                   </p>
                   {req.message && (
                     <p className="text-xs text-[#94A3B8] italic bg-[#070D18] p-2.5 rounded-xl border border-[#1E293B]">

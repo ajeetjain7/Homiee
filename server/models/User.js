@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  email: { type: String, required: true, unique: true, lowercase: true, index: true },
+  email: { type: String, required: true, unique: true, lowercase: true, index: true, trim: true },
   password: { type: String, select: false },
   googleId: { type: String, default: '', index: true },
   avatar: { type: String, default: '' },
@@ -18,28 +18,28 @@ const userSchema = new mongoose.Schema({
   about: { type: String, default: '', trim: true },
 
   // Role & Capabilities
-  primaryRole: { type: String, default: 'Fullstack Developer' },
-  capabilities: [{ type: String, trim: true }], // e.g. 'PPT Making', 'Pitch Deck', 'Backend', 'Frontend'
+  primaryRole: { type: String, default: 'Fullstack Developer', trim: true },
+  capabilities: [{ type: String, trim: true }], // e.g. 'PPT Making & Pitch Deck', 'Backend & APIs'
   status: { type: String, enum: ['Looking for Team', 'Team Full', 'Not Available'], default: 'Looking for Team' },
   
   // Profile Completion Flags
-  profileComplete: { type: Boolean, default: false },
-  isProfileComplete: { type: Boolean, default: false },
-  isPublic: { type: Boolean, default: true },
+  profileComplete: { type: Boolean, default: false, index: true },
+  isProfileComplete: { type: Boolean, default: false, index: true },
+  isPublic: { type: Boolean, default: true, index: true },
   
   // High Concurrency Match Metrics
-  sihReadinessScore: { type: Number, default: 20 },
+  sihReadinessScore: { type: Number, default: 20, index: true },
   technicalSkills: [{ type: String, trim: true }],
   sihThemes: [{ type: String, trim: true }],
   featuredProjects: [{ title: String, link: String, description: String }],
   hackathonsCount: { type: Number, default: 0 },
   
   // External Profiles & Credentials
-  whatsappNumber: { type: String, default: '' },
-  github: { type: String, default: '' },
-  linkedin: { type: String, default: '' },
-  portfolio: { type: String, default: '' },
-  resumeUrl: { type: String, default: '' },
+  whatsappNumber: { type: String, default: '', trim: true },
+  github: { type: String, default: '', trim: true },
+  linkedin: { type: String, default: '', trim: true },
+  portfolio: { type: String, default: '', trim: true },
+  resumeUrl: { type: String, default: '', trim: true },
   dsaRating: { type: String, default: '' },
   
   // Competitive Programming
@@ -48,11 +48,22 @@ const userSchema = new mongoose.Schema({
   codechefRating: { type: String, default: 'N/A' }
 }, { timestamps: true });
 
-// Explicit Compound & Field Indexes
+// Compound & Field Indexes for High-Performance Queries
 userSchema.index({ primaryRole: 1, sihReadinessScore: -1 });
+userSchema.index({ gender: 1, sihReadinessScore: -1 });
 userSchema.index({ technicalSkills: 1 });
-userSchema.index({ gender: 1 });
-userSchema.index({ isPublic: 1, status: 1 });
+userSchema.index({ capabilities: 1 });
+userSchema.index({ sihThemes: 1 });
 userSchema.index({ profileComplete: 1, isProfileComplete: 1 });
+
+// Text Index for full-text search across candidate directory
+userSchema.index({
+  name: 'text',
+  college: 'text',
+  classBranch: 'text',
+  technicalSkills: 'text',
+  capabilities: 'text',
+  about: 'text'
+});
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { io } from 'socket.io-client';
 import CreateTeamModal from '../components/CreateTeamModal';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import api, { API_BASE } from '../services/api';
 
 const MyTeam = ({ currentUser }) => {
   const [teams, setTeams] = useState([]);
@@ -33,19 +31,10 @@ const MyTeam = ({ currentUser }) => {
   const fetchMyTeams = async () => {
     setLoading(true);
     try {
-      const config = {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        params: {
-          userId: localUser?._id,
-          email: localUser?.email,
-          userName: localUser?.name
-        }
-      };
-
       let fetchedTeams = [];
 
       try {
-        const res = await axios.get(`${API_BASE}/api/teams/team`, config);
+        const res = await api.get('/api/teams/team');
         if (res.data?.teams && Array.isArray(res.data.teams) && res.data.teams.length > 0) {
           fetchedTeams = res.data.teams;
         } else if (res.data?.team) {
@@ -54,39 +43,14 @@ const MyTeam = ({ currentUser }) => {
       } catch (err) {
         console.warn('API /team error, trying /my-team:', err);
         try {
-          const res2 = await axios.get(`${API_BASE}/api/teams/my-team`, config);
+          const res2 = await api.get('/api/teams/my-team');
           if (res2.data?.teams && Array.isArray(res2.data.teams)) {
             fetchedTeams = res2.data.teams;
           } else if (res2.data?.team) {
             fetchedTeams = [res2.data.team];
           }
         } catch {
-          // fallback below
-        }
-      }
-
-      // Fallback: Check all teams to ensure nothing is missed
-      if (fetchedTeams.length === 0) {
-        const allRes = await axios.get(`${API_BASE}/api/teams`);
-        const userTeams = allRes.data.filter(t => {
-          const isLeaderMatch = 
-            (t.leader?._id && t.leader._id === localUser?._id) ||
-            t.leader === localUser?._id ||
-            (localUser?.email && t.leader?.email?.toLowerCase() === localUser.email.toLowerCase()) ||
-            (localUser?.name && (t.leaderName?.toLowerCase() === localUser.name.toLowerCase() || t.leader?.name?.toLowerCase() === localUser.name.toLowerCase()));
-
-          const isMemberMatch = Array.isArray(t.members) && t.members.some(m => 
-            (m?._id && m._id === localUser?._id) ||
-            m === localUser?._id ||
-            (localUser?.email && m?.email?.toLowerCase() === localUser.email.toLowerCase()) ||
-            (localUser?.name && m?.name?.toLowerCase() === localUser.name.toLowerCase())
-          );
-
-          return isLeaderMatch || isMemberMatch;
-        });
-
-        if (userTeams.length > 0) {
-          fetchedTeams = userTeams;
+          // ignore
         }
       }
 
@@ -110,7 +74,7 @@ const MyTeam = ({ currentUser }) => {
 
   useEffect(() => {
     fetchMyTeams();
-  }, [localUser?._id, localUser?.email, localUser?.name]);
+  }, [localUser?._id, localUser?.email]);
 
   // Current active team
   const activeTeam = teams.find(t => t._id === selectedTeamId) || (teams.length > 0 ? teams[0] : null);
@@ -120,7 +84,7 @@ const MyTeam = ({ currentUser }) => {
     if (!activeTeam?._id) return;
 
     // 1. Fetch persistent history from MongoDB via REST endpoint
-    axios.get(`${API_BASE}/api/teams/${activeTeam._id}/messages`)
+    api.get(`/api/teams/${activeTeam._id}/messages`)
       .then(res => {
         if (Array.isArray(res.data) && res.data.length > 0) {
           setMessages(res.data);
@@ -128,9 +92,10 @@ const MyTeam = ({ currentUser }) => {
       })
       .catch(err => console.warn('Could not preload messages:', err.message));
 
-    // 2. Connect Socket.IO for cross-device real-time sync
+    // 2. Connect Socket.IO for real-time sync with authentication handshake
     const socket = io(API_BASE, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      auth: { token }
     });
     socketRef.current = socket;
 
@@ -138,7 +103,8 @@ const MyTeam = ({ currentUser }) => {
       setSocketConnected(true);
       socket.emit('join_team', {
         teamId: activeTeam._id,
-        user: localUser
+        user: localUser,
+        token
       });
     });
 
@@ -150,7 +116,6 @@ const MyTeam = ({ currentUser }) => {
 
     socket.on('receive_message', (msg) => {
       setMessages((prev) => {
-        // Prevent duplicate rendering of same message ID
         if (prev.some(m => m._id === msg._id)) return prev;
         return [...prev, msg];
       });
@@ -163,7 +128,7 @@ const MyTeam = ({ currentUser }) => {
     return () => {
       socket.disconnect();
     };
-  }, [activeTeam?._id]);
+  }, [activeTeam?._id, token]);
 
   // Scroll to bottom of chat on new messages
   useEffect(() => {
@@ -177,38 +142,23 @@ const MyTeam = ({ currentUser }) => {
     const messageText = inputMessage.trim();
     setInputMessage('');
 
-    const senderPayload = {
-      _id: localUser?._id || 'user_anon',
-      name: localUser?.name || 'Innovator',
-      email: localUser?.email || '',
-      avatar: localUser?.avatar || localUser?.photoUrl || '',
-      role: localUser?.primaryRole || 'Squad Member'
-    };
-
     if (socketRef.current && socketConnected) {
       socketRef.current.emit('send_message', {
         teamId: activeTeam._id,
         message: messageText,
-        user: senderPayload
+        user: localUser,
+        token
       });
     } else {
       // Direct REST fallback with MongoDB persistence
       try {
-        const res = await axios.post(`${API_BASE}/api/teams/${activeTeam._id}/messages`, {
-          message: messageText,
-          user: senderPayload
+        const res = await api.post(`/api/teams/${activeTeam._id}/messages`, {
+          message: messageText
         });
         setMessages(prev => [...prev, res.data]);
       } catch (err) {
         console.error('REST Message dispatch error:', err);
-        const fallbackMsg = {
-          _id: `msg_${Date.now()}`,
-          teamId: activeTeam._id,
-          message: messageText,
-          user: senderPayload,
-          createdAt: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, fallbackMsg]);
+        toast.error('Failed to send message.');
       }
     }
   };
@@ -254,7 +204,7 @@ const MyTeam = ({ currentUser }) => {
             <div className="space-y-2 max-w-md mx-auto">
               <h2 className="text-2xl font-black text-white">No Squads Formed Yet</h2>
               <p className="text-xs text-[#CBD5E1] leading-relaxed">
-                You haven't formed or joined a team yet. Click <span className="text-amber-400 font-bold">"Create Team"</span> (top right) to start one, or explore open squads to request joining.
+                You haven't formed or joined a team yet. Click <span className="text-amber-400 font-bold">"+ Create a Squad"</span> below to start one, or explore open squads to request joining.
               </p>
             </div>
 
@@ -277,7 +227,7 @@ const MyTeam = ({ currentUser }) => {
             <div className="pt-6 border-t border-[#1E293B] max-w-lg mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
               <div className="bg-[#070D18] border border-[#1E293B] p-3.5 rounded-xl space-y-1">
                 <span className="text-[10px] font-mono text-[#F59E0B] font-bold block">💡 CREATING A SQUAD</span>
-                <p className="text-[11px] text-[#CBD5E1]">Click "Create Team" to define your problem statement and open role vacancies.</p>
+                <p className="text-[11px] text-[#CBD5E1]">Click "+ Create a Squad" to define your problem statement and open role vacancies.</p>
               </div>
               <div className="bg-[#070D18] border border-[#1E293B] p-3.5 rounded-xl space-y-1">
                 <span className="text-[10px] font-mono text-[#38BDF8] font-bold block">🤝 JOINING A SQUAD</span>
@@ -305,7 +255,7 @@ const MyTeam = ({ currentUser }) => {
 
   // Add leader
   if (leaderObj && (leaderObj._id || leaderObj.name || leaderObj.email || activeTeam.leaderName)) {
-    const isUserLeader = (localUser && (localUser._id === leaderObj._id || localUser.name === leaderObj.name || localUser.name === activeTeam.leaderName || localUser.email === leaderObj.email));
+    const isUserLeader = (localUser && (localUser._id === leaderObj._id || localUser.email === leaderObj.email));
     const leaderEmail = leaderObj.email || (isUserLeader && localUser?.email ? localUser.email : 'leader@sih.edu');
     
     uniqueMembers.push({ 
@@ -324,7 +274,7 @@ const MyTeam = ({ currentUser }) => {
     
     if (!addedIds.has(mId)) {
       const isLeader = leaderObj ? (leaderObj._id?.toString() === mId || leaderObj.toString() === mId) : false;
-      const isMe = localUser && (localUser._id === mId || localUser.name === mObj.name || (localUser.email && localUser.email === mObj.email));
+      const isMe = localUser && (localUser._id === mId || (localUser.email && localUser.email === mObj.email));
       const memberEmail = mObj.email || (isMe && localUser?.email ? localUser.email : (isLeader ? leaderObj?.email : `member_${idx + 1}@sih.edu`));
 
       uniqueMembers.push({
@@ -342,52 +292,42 @@ const MyTeam = ({ currentUser }) => {
   return (
     <div className="max-w-6xl mx-auto space-y-8 font-sans text-[#F8FAFC] select-none pb-12">
       
-      {/* Squads Switcher Bar if User Leads/Belongs to Multiple Teams */}
-      {teams.length > 1 && (
-        <div className="bg-[#0B132B] border border-[#1E293B] p-4 rounded-2xl space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-[#F59E0B] font-bold tracking-widest uppercase">
-              ⚡ YOUR ACTIVE SQUADS ({teams.length})
-            </span>
-            <span className="text-xs text-[#CBD5E1]">Select a squad to view its roster & chat:</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {teams.map((t) => {
-              const isSelected = t._id === activeTeam._id;
-              const isLeader = (t.leader?._id === localUser?._id || t.leader === localUser?._id || t.leaderName === localUser?.name || t.leader?.email === localUser?.email);
-              const mCount = Array.isArray(t.members) ? t.members.length : 1;
-
-              return (
-                <button
-                  key={t._id}
-                  onClick={() => setSelectedTeamId(t._id)}
-                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#17130A] border-[#F59E0B] shadow-lg shadow-amber-500/10'
-                      : 'bg-[#070D18] border-[#1E293B] hover:border-[#334155]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                      isLeader ? 'bg-[#261E0C] text-[#FBBF24] border border-[#785412]' : 'bg-[#0F172A] text-[#CBD5E1]'
-                    }`}>
-                      {isLeader ? '👑 Leader' : '⚡ Member'}
-                    </span>
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold">
-                      {mCount}/6 Members
-                    </span>
-                  </div>
-                  <h4 className="font-bold text-white text-sm truncate">{t.name}</h4>
-                  <p className="text-[11px] font-mono text-[#94A3B8] truncate mt-0.5">
-                    PS: {t.psCode || 'SIH2026'} • {t.sihTheme}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
+      {/* Multi-Squad Switcher Navigation (Up to 3 Squads) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0B132B] border border-[#1E293B] p-3.5 rounded-2xl">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <span className="text-[11px] font-mono text-gray-400 font-bold uppercase mr-1 flex items-center gap-1">
+            <span>⚡</span> MY SQUADS ({teams.length}/3):
+          </span>
+          {teams.map((t, idx) => {
+            const isSelected = t._id === activeTeam._id;
+            const isLead = (t.leader?._id || t.leader) === localUser?._id;
+            return (
+              <button
+                key={t._id}
+                onClick={() => setSelectedTeamId(t._id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  isSelected
+                    ? 'bg-[#F59E0B] text-black shadow-md shadow-amber-500/20'
+                    : 'bg-[#070D18] text-gray-300 hover:text-white border border-[#334155]'
+                }`}
+              >
+                <span>{isLead ? '👑' : '🛡️'}</span>
+                <span>{t.name}</span>
+                <span className="text-[10px] opacity-75">({t.members?.length || 1}/6)</span>
+              </button>
+            );
+          })}
         </div>
-      )}
+
+        {teams.length < 3 && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="self-start sm:self-auto bg-[#17130A] hover:bg-amber-500/20 border border-[#F59E0B]/60 text-[#FBBF24] font-mono text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+          >
+            <span>+</span> Form Another Squad ({3 - teams.length} left)
+          </button>
+        )}
+      </div>
 
       {/* 1. Team Header Banner */}
       <div className="bg-[#0B132B] border border-[#1E293B] rounded-3xl p-6 md:p-8 space-y-6 shadow-2xl relative overflow-hidden backdrop-blur-xl">
@@ -459,7 +399,7 @@ const MyTeam = ({ currentUser }) => {
           {uniqueMembers.map((member, idx) => {
             const memberName = member.name || (member.isLeader ? 'Squad Leader' : `Teammate ${idx + 1}`);
             const memberInitials = memberName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-            const isUserHimself = localUser && (localUser._id === member._id || localUser.name === member.name || (localUser.email && localUser.email === member.email));
+            const isUserHimself = localUser && (localUser._id === member._id || localUser.email === member.email);
 
             return (
               <div
@@ -523,7 +463,7 @@ const MyTeam = ({ currentUser }) => {
                   </div>
                 </div>
 
-                {/* Email Address (Private, high contrast, copyable) */}
+                {/* Email Address */}
                 <div className="bg-[#070D18] border border-[#1E293B] p-3 rounded-xl flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 truncate">
                     <span className="text-amber-400 text-xs">✉️</span>
@@ -625,7 +565,7 @@ const MyTeam = ({ currentUser }) => {
               </div>
             ) : (
               messages.map((msg, mIdx) => {
-                const isMe = localUser && (localUser._id === msg.user?._id || localUser.name === msg.user?.name);
+                const isMe = localUser && (localUser._id === msg.user?._id || localUser.name === msg.user?.name || (localUser.email && localUser.email === msg.user?.email));
                 const senderName = msg.user?.name || 'Teammate';
                 const senderRole = msg.user?.role || 'Member';
                 const timeStr = msg.createdAt 

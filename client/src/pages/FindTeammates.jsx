@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import toast from 'react-hot-toast';
+import api from '../services/api';
 
 const DEFAULT_CANDIDATES = [
   {
@@ -131,10 +131,6 @@ const TECH_STACK_OPTIONS = [
   'PPT Making', 'React', 'Node.js', 'Python', 'Docker', 'PyTorch', 'MongoDB', 'Flutter'
 ];
 
-const COMMON_PS_CODES = [
-  'All PS Codes', 'SIH1420', 'SIH1425', 'SIH1430', 'SIH1442', 'SIH1450', 'SIH1462', 'SIH1480', 'SIH1495', 'SIH1510'
-];
-
 const FindTeammates = ({ currentUser }) => {
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -176,52 +172,27 @@ const FindTeammates = ({ currentUser }) => {
         psCode: selectedPsCode === 'All PS Codes' ? '' : selectedPsCode
       });
 
-      const res = await axios.get(`http://localhost:5000/api/auth/teammates?${queryParams.toString()}`);
+      const res = await api.get(`/api/auth/teammates?${queryParams.toString()}`);
       let fetchedList = res.data;
 
       if (!fetchedList || fetchedList.length === 0) {
         fetchedList = DEFAULT_CANDIDATES;
       }
 
-      // Merge current user if complete
-      if (localUser && (localUser.isProfileComplete || localUser.profileComplete)) {
-        const alreadyInList = fetchedList.some(u => u._id === localUser._id || u.email === localUser.email);
-        if (!alreadyInList) {
-          fetchedList = [localUser, ...fetchedList];
-        }
+      // STRICT EXCLUSION: User never sees themselves in teammate discovery
+      if (localUser) {
+        fetchedList = fetchedList.filter(u => 
+          u._id !== localUser._id && 
+          u.email?.toLowerCase() !== localUser.email?.toLowerCase()
+        );
       }
 
-      // Client-side fallback filter if offline/demo
-      const filtered = fetchedList.filter((c) => {
-        const matchSearch = !skillSearch.trim() || 
-          c.name.toLowerCase().includes(skillSearch.toLowerCase()) ||
-          (c.classBranch && c.classBranch.toLowerCase().includes(skillSearch.toLowerCase())) ||
-          (c.college && c.college.toLowerCase().includes(skillSearch.toLowerCase())) ||
-          (c.about && c.about.toLowerCase().includes(skillSearch.toLowerCase())) ||
-          (c.technicalSkills && c.technicalSkills.some(s => s.toLowerCase().includes(skillSearch.toLowerCase()))) ||
-          (c.capabilities && c.capabilities.some(cap => cap.toLowerCase().includes(skillSearch.toLowerCase())));
-
-        const matchGender = selectedGender === 'All Genders' || selectedGender === 'All' || c.gender === selectedGender;
-        const matchRole = selectedRole === 'All Technical Roles' || selectedRole === 'All Roles' || c.primaryRole === selectedRole;
-        const matchCap = selectedCapability === 'All Capabilities' || (c.capabilities && c.capabilities.includes(selectedCapability));
-        const matchTheme = selectedTheme === 'All Interested SIH Themes' || selectedTheme === 'All Themes' || (c.sihThemes && c.sihThemes.includes(selectedTheme));
-        const matchYear = selectedYear === 'All Academic Years' || selectedYear === 'All' || c.year === selectedYear;
-        const matchPs = !selectedPsCode || selectedPsCode === 'All PS Codes' || (c.about && c.about.toLowerCase().includes(selectedPsCode.toLowerCase()));
-        
-        const matchSkills = selectedSkills.length === 0 || selectedSkills.every(sk => 
-          (c.technicalSkills && c.technicalSkills.some(ts => ts.toLowerCase().includes(sk.toLowerCase()))) ||
-          (c.capabilities && c.capabilities.some(cap => cap.toLowerCase().includes(sk.toLowerCase())))
-        );
-
-        return matchSearch && matchGender && matchRole && matchCap && matchTheme && matchYear && matchPs && matchSkills;
-      });
-
-      setCandidates(filtered);
+      setCandidates(fetchedList);
     } catch (err) {
-      console.warn('Backend unavailable, using local teammate pool:', err);
+      console.warn('Backend query note, using filtered fallback:', err);
       let list = DEFAULT_CANDIDATES;
-      if (localUser && (localUser.isProfileComplete || localUser.profileComplete)) {
-        list = [localUser, ...DEFAULT_CANDIDATES.filter(c => c.email !== localUser.email)];
+      if (localUser) {
+        list = DEFAULT_CANDIDATES.filter(c => c.email?.toLowerCase() !== localUser.email?.toLowerCase());
       }
       setCandidates(list);
     } finally {
@@ -232,7 +203,7 @@ const FindTeammates = ({ currentUser }) => {
   useEffect(() => {
     const timer = setTimeout(fetchTeammates, 300);
     return () => clearTimeout(timer);
-  }, [skillSearch, selectedRole, selectedCapability, selectedTheme, selectedYear, selectedGender, selectedPsCode, selectedSkills, localUser?.profileComplete, localUser?.isProfileComplete]);
+  }, [skillSearch, selectedRole, selectedCapability, selectedTheme, selectedYear, selectedGender, selectedPsCode, selectedSkills, localUser?._id]);
 
   const [mySquads, setMySquads] = useState([]);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
@@ -246,12 +217,7 @@ const FindTeammates = ({ currentUser }) => {
   const fetchMySquads = async () => {
     if (!localUser?._id && !localUser?.email) return;
     try {
-      const token = localStorage.getItem('token');
-      const config = {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        params: { userId: localUser?._id, email: localUser?.email, userName: localUser?.name }
-      };
-      const res = await axios.get('http://localhost:5000/api/teams/team', config);
+      const res = await api.get('/api/teams/team');
       if (res.data?.teams && res.data.teams.length > 0) {
         setMySquads(res.data.teams);
         setSelectedSquadId(res.data.teams[0]._id);
@@ -297,23 +263,15 @@ const FindTeammates = ({ currentUser }) => {
 
     setSendingInvite(true);
     try {
-      const token = localStorage.getItem('token');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-
       const payload = {
-        fromUserId: localUser._id || localUser.id || 'leader_user',
-        fromUserName: localUser.name || 'Squad Leader',
         toUserId: selectedCandidate._id,
-        toUserName: selectedCandidate.name,
         teamId: targetSquad._id,
-        teamName: targetSquad.name,
-        psCode: targetSquad.psCode,
         role: inviteRole || selectedCandidate.primaryRole || 'Squad Member',
         type: 'invite',
         message: inviteMessage
       };
 
-      await axios.post('http://localhost:5000/api/requests', payload, config);
+      await api.post('/api/requests', payload);
 
       toast.success(`🎉 Invitation sent to ${selectedCandidate.name} for ${targetSquad.name}!`);
       setInviteModalOpen(false);
@@ -333,7 +291,7 @@ const FindTeammates = ({ currentUser }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-mono text-[#F59E0B] font-bold tracking-widest uppercase">
-            ⚡ SIH 2026 TEAMMATE DISCOVERY • {candidates.length} STUDENT INNOVATORS
+            ⚡ SIH 2026 TEAMMATE DISCOVERY • {candidates.length} CANDIDATES
           </span>
           <h1 className="text-3xl font-black text-white tracking-tight mt-0.5">Find SIH Teammates</h1>
           <p className="text-xs text-[#CBD5E1]">Discover students by SIH PS code, gender diversity, tech stacks, PPT strengths, and credentials.</p>
@@ -349,35 +307,6 @@ const FindTeammates = ({ currentUser }) => {
         </div>
       </div>
 
-      {/* User's Own Live Card Status Banner */}
-      {localUser && (localUser.isProfileComplete || localUser.profileComplete) && (
-        <div className="bg-[#0E201B] border border-[#059669]/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#34D399] text-[#000000] font-black flex items-center justify-center text-sm shadow-md">
-              ✓
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[#34D399] font-mono">YOUR TEAMMATE CARD IS LIVE IN SIH DIRECTORY</span>
-                <span className="bg-[#0E3A2F] text-[#34D399] text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-[#059669]/40">
-                  {localUser.sihReadinessScore || 85}% READINESS
-                </span>
-              </div>
-              <p className="text-xs text-[#E2E8F0] mt-0.5">
-                Squad leaders discover you as <span className="text-white font-black">{localUser.name}</span> ({localUser.primaryRole || 'Fullstack Developer'}) from {localUser.college || 'your institute'}.
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => window.location.href = '/profile'}
-            className="bg-[#070D18] hover:bg-[#0B132B] border border-[#334155] text-xs text-[#F8FAFC] font-mono font-bold px-4 py-2 rounded-xl cursor-pointer transition-all"
-          >
-            ✏️ Edit Card Info
-          </button>
-        </div>
-      )}
-
       {/* Search & Filter Controls Matrix */}
       <div className="bg-[#0B132B] border border-[#1E293B] p-5 rounded-2xl space-y-4 shadow-2xl">
         
@@ -392,7 +321,7 @@ const FindTeammates = ({ currentUser }) => {
             className="bg-[#070D18] border border-[#334155] text-xs px-3.5 py-2.5 rounded-xl text-white outline-none focus:border-[#F59E0B] transition-all placeholder-[#94A3B8]"
           />
 
-          {/* Filter 1: SIH PS Code (Input or Dropdown) */}
+          {/* Filter 1: SIH PS Code */}
           <input
             type="text"
             placeholder="🎯 PS Code (e.g. SIH1420)..."
@@ -401,7 +330,7 @@ const FindTeammates = ({ currentUser }) => {
             className="bg-[#070D18] border border-[#334155] text-xs px-3.5 py-2.5 rounded-xl text-white outline-none focus:border-[#F59E0B] transition-all placeholder-[#94A3B8]"
           />
 
-          {/* Filter 2: Gender Filter (Male / Female / Other / All) */}
+          {/* Filter 2: Gender Filter */}
           <select
             value={selectedGender}
             onChange={(e) => setSelectedGender(e.target.value)}
@@ -487,15 +416,12 @@ const FindTeammates = ({ currentUser }) => {
       {/* Teammates Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {candidates.map((c, idx) => {
-          const isUserCard = localUser && (localUser._id === c._id || localUser.email === c.email);
           const initials = c.name ? c.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'IN';
 
           return (
             <div
               key={c._id || idx}
-              className={`bg-[#0B132B] border rounded-2xl p-6 relative flex flex-col justify-between space-y-4 shadow-xl backdrop-blur-xl transition-all hover:border-[#475569] ${
-                isUserCard ? 'border-amber-500 shadow-amber-500/10 ring-1 ring-amber-500/30' : 'border-[#1E293B]'
-              }`}
+              className="bg-[#0B132B] border border-[#1E293B] hover:border-[#475569] rounded-2xl p-6 relative flex flex-col justify-between space-y-4 shadow-xl backdrop-blur-xl transition-all"
             >
               {/* Top Tag Badges */}
               <div className="flex items-center justify-between">
@@ -510,16 +436,9 @@ const FindTeammates = ({ currentUser }) => {
                   )}
                 </div>
 
-                {isUserCard ? (
-                  <span className="bg-[#0E3A2F] border border-[#059669]/60 text-[#34D399] text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#34D399] animate-pulse" />
-                    YOU
-                  </span>
-                ) : (
-                  <span className="bg-[#0C2A4A] border border-[#0284C7]/50 text-[#38BDF8] text-[10px] font-mono font-bold px-2 py-0.5 rounded">
-                    {c.sihReadinessScore || 85}% READINESS
-                  </span>
-                )}
+                <span className="bg-[#0C2A4A] border border-[#0284C7]/50 text-[#38BDF8] text-[10px] font-mono font-bold px-2 py-0.5 rounded">
+                  {c.sihReadinessScore || 85}% READINESS
+                </span>
               </div>
 
               {/* Teammate Header Info */}
@@ -615,21 +534,12 @@ const FindTeammates = ({ currentUser }) => {
               </div>
 
               {/* Action Button */}
-              {isUserCard ? (
-                <button
-                  onClick={() => window.location.href = '/profile'}
-                  className="w-full bg-[#17130A] border border-[#F59E0B]/70 hover:border-[#F59E0B] text-[#FBBF24] font-mono font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all"
-                >
-                  ⚙️ Manage Your Teammate Card
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleOpenInvite(c)}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-[#000000] font-black text-xs py-2.5 rounded-xl cursor-pointer transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-                >
-                  ⚡ Invite to Squad
-                </button>
-              )}
+              <button
+                onClick={() => handleOpenInvite(c)}
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-[#000000] font-black text-xs py-2.5 rounded-xl cursor-pointer transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                ⚡ Invite to Squad
+              </button>
             </div>
           );
         })}
@@ -737,4 +647,4 @@ const FindTeammates = ({ currentUser }) => {
   );
 };
 
-export default FindTeammates;
+export default FindTeammates;

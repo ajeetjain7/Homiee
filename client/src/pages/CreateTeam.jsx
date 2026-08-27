@@ -1,365 +1,289 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import api from '../services/api';
+
+const SIH_THEMES = [
+  'Agriculture & Rural Development',
+  'Clean & Renewable Green Technology',
+  'Cybersecurity & Disaster Management',
+  'Smart Education & Learning',
+  'Healthcare & Biomedical Devices',
+  'Smart Automation & Robotics',
+  'Fintech & Web3 Blockchain',
+  'Heritage, Culture & Tourism',
+  'Transportation & Logistics',
+  'Open Innovation / Miscellaneous'
+];
 
 const CreateTeam = () => {
-  const user = JSON.parse(localStorage.getItem('userInfo') || '{}');
-
-  const [form, setForm] = useState({
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
     name: '',
     sihTheme: 'Agriculture & Rural Development',
     categoryEdition: 'Software Edition',
-    organization: '',
     psCode: '',
     problemStatementTitle: '',
+    organization: '',
     tagline: '',
-    description: ''
+    description: '',
+    vacancies: [
+      { roleName: 'Backend Developer', count: 1, status: 'Vacant' },
+      { roleName: 'PPT & Pitch Designer', count: 1, status: 'Vacant' }
+    ],
+    criticalSkills: [
+      { skillName: 'React', priority: 'CRITICAL' },
+      { skillName: 'PPT Making', priority: 'CRITICAL' }
+    ]
   });
 
-  const [vacancies, setVacancies] = useState([
-    { roleName: 'Backend Developer', status: 'Vacant' },
-    { roleName: 'AI/ML Engineer', status: 'Vacant' },
-    { roleName: 'UI/UX Designer', status: 'Vacant' }
-  ]);
-
-  const [selectedRoleInput, setSelectedRoleInput] = useState('IoT & Hardware Engineer');
-
-  const [criticalSkills, setCriticalSkills] = useState([
-    { skillName: 'Python', priority: 'CRITICAL' },
-    { skillName: 'React', priority: 'PREFERRED' },
-    { skillName: 'PostgreSQL', priority: 'PREFERRED' }
-  ]);
-
-  const [skillInput, setSkillInput] = useState('');
-  const [skillPriority, setSkillPriority] = useState('CRITICAL');
+  const [newVacancyRole, setNewVacancyRole] = useState('');
+  const [newSkillName, setNewSkillName] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleAddVacancy = () => {
-    if (!selectedRoleInput) return;
-    setVacancies([...vacancies, { roleName: selectedRoleInput, status: 'Vacant' }]);
+    if (!newVacancyRole.trim()) return;
+    setFormData({
+      ...formData,
+      vacancies: [...formData.vacancies, { roleName: newVacancyRole.trim(), count: 1, status: 'Vacant' }]
+    });
+    setNewVacancyRole('');
   };
 
-  const handleRemoveVacancy = (index) => {
-    setVacancies(vacancies.filter((_, i) => i !== index));
+  const handleRemoveVacancy = (idx) => {
+    setFormData({
+      ...formData,
+      vacancies: formData.vacancies.filter((_, i) => i !== idx)
+    });
   };
 
   const handleAddSkill = () => {
-    if (!skillInput.trim()) return;
-    setCriticalSkills([...criticalSkills, { skillName: skillInput.trim(), priority: skillPriority }]);
-    setSkillInput('');
+    if (!newSkillName.trim()) return;
+    setFormData({
+      ...formData,
+      criticalSkills: [...formData.criticalSkills, { skillName: newSkillName.trim(), priority: 'CRITICAL' }]
+    });
+    setNewSkillName('');
   };
 
-  const handleRemoveSkill = (index) => {
-    setCriticalSkills(criticalSkills.filter((_, i) => i !== index));
+  const handleRemoveSkill = (idx) => {
+    setFormData({
+      ...formData,
+      criticalSkills: formData.criticalSkills.filter((_, i) => i !== idx)
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!form.name || !form.psCode || !form.problemStatementTitle || !form.description) {
-      toast.error('Please fill in all required fields.');
+    if (!formData.name || !formData.psCode || !formData.problemStatementTitle || !formData.description) {
+      toast.error('Please fill all required fields');
       return;
     }
 
+    setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      const payload = {
+        ...formData,
+        tagline: formData.tagline || formData.problemStatementTitle
+      };
 
-      await axios.post('http://localhost:5000/api/teams/create', {
-        ...form,
-        vacancies,
-        criticalSkills,
-        userId: user._id || 'user_sih_2026',
-        userName: user.name || 'Student Innovator',
-        email: user.email || ''
-      }, config);
+      await api.post('/api/teams/create', payload);
 
-      toast.success('🎉 SIH Squad published successfully!');
-      window.location.href = '/my-team';
+      toast.success(`🎉 Squad "${formData.name}" created successfully!`);
+      navigate('/team');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create team.');
+      console.error('Create Team Error:', err);
+      toast.error(err.response?.data?.message || 'Failed to create squad. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#070D18] text-white p-4 md:p-8 font-sans relative overflow-hidden select-none">
-      
-      {/* Background Grid Lines Overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1E293B40_1px,transparent_1px),linear-gradient(to_bottom,#1E293B40_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] pointer-events-none" />
+    <div className="max-w-3xl mx-auto space-y-6 font-sans text-white select-none pb-12">
+      <div className="space-y-1">
+        <span className="text-[10px] font-mono text-[#F59E0B] font-bold tracking-widest uppercase">
+          SIH 2026 OFFICIAL REGISTRATION
+        </span>
+        <h1 className="text-3xl font-black text-white tracking-tight">Create SIH 2026 Squad</h1>
+        <p className="text-xs text-[#CBD5E1]">Publish your team requirements and open roles for student innovators.</p>
+      </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto space-y-8">
-        
-        {/* Top Pill Badge & Title */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 bg-[#17130A] border border-dashed border-[#F59E0B]/60 text-[#F59E0B] font-mono text-[11px] font-extrabold px-3.5 py-1.5 rounded-lg uppercase tracking-wider">
-            🏆 SMART INDIA HACKATHON 2026 SQUAD BUILDER
-          </div>
-          <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Form Your SIH Team</h1>
-          <p className="text-xs md:text-sm text-gray-400 max-w-xl mx-auto leading-relaxed">
-            Assemble a balanced squad of up to 6 innovators, define your target SIH problem statement, and eliminate team skill gaps.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-8 text-xs">
+      <div className="bg-[#0B132B] border border-[#1E293B] rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-xl">
+        <form onSubmit={handleSubmit} className="space-y-5 text-xs">
           
-          {/* SECTION 1: SIH Theme & Problem Statement */}
-          <div className="bg-[#0B132B]/90 border border-gray-800 rounded-2xl p-6 md:p-8 shadow-2xl relative space-y-5 backdrop-blur-xl">
-            <div className="absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-gray-600" />
-            <div className="absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-gray-600" />
-
-            <div className="flex items-center justify-between pb-3 border-b border-gray-800/80">
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                <span>🏛️</span> <span>1. SIH Theme & Problem Statement</span>
-              </div>
-              <span className="text-[10px] font-mono font-bold text-[#34D399] bg-[#0E3A2F] border border-[#059669]/40 px-2 py-0.5 rounded">
-                OFFICIAL SIH CONTEXT
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-gray-400 mb-1 font-medium">SIH Team Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. AgriTech Pioneers"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full bg-[#070D18] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#F59E0B]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-400 mb-1 font-medium">SIH Theme / Category *</label>
-                <select
-                  value={form.sihTheme}
-                  onChange={(e) => setForm({ ...form, sihTheme: e.target.value })}
-                  className="w-full bg-[#070D18] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#F59E0B] cursor-pointer"
-                >
-                  <option value="Agriculture & Rural Development">Agriculture & Rural Development</option>
-                  <option value="MedTech & BioTech Healthcare">MedTech & BioTech Healthcare</option>
-                  <option value="Clean & Renewable Green Technology">Clean & Renewable Green Technology</option>
-                  <option value="Smart Automation, IoT & Robotics">Smart Automation, IoT & Robotics</option>
-                  <option value="Cybersecurity & Disaster Management">Cybersecurity & Disaster Management</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Edition Toggle Switches */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-gray-400 mb-2 font-medium">SIH Category Edition</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, categoryEdition: 'Software Edition' })}
-                  className={`py-2.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer ${
-                    form.categoryEdition === 'Software Edition'
-                      ? 'bg-[#261E0C] border border-[#785412] text-[#FBBF24]'
-                      : 'bg-[#070D18] border border-gray-800 text-gray-400'
-                  }`}
-                >
-                  &lt;/&gt; Software Edition
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, categoryEdition: 'Hardware Edition' })}
-                  className={`py-2.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer ${
-                    form.categoryEdition === 'Hardware Edition'
-                      ? 'bg-[#261E0C] border border-[#785412] text-[#FBBF24]'
-                      : 'bg-[#070D18] border border-gray-800 text-gray-400'
-                  }`}
-                >
-                  ⚙ Hardware Edition
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-gray-400 mb-1 font-medium">Ministry / Organization (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Ministry of Agriculture / ISRO"
-                  value={form.organization}
-                  onChange={(e) => setForm({ ...form, organization: e.target.value })}
-                  className="w-full bg-[#070D18] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#F59E0B]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-400 mb-1 font-medium">SIH PS Code *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="SIH-1420"
-                  value={form.psCode}
-                  onChange={(e) => setForm({ ...form, psCode: e.target.value })}
-                  className="w-full bg-[#070D18] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#F59E0B]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-gray-400 mb-1 font-medium">Problem Statement Title *</label>
+              <label className="block text-gray-300 font-bold mb-1">Squad / Team Name *</label>
               <input
                 type="text"
                 required
-                placeholder="e.g. AI-Powered Crop Disease Detection and Local Market Support"
-                value={form.problemStatementTitle}
-                onChange={(e) => setForm({ ...form, problemStatementTitle: e.target.value })}
-                className="w-full bg-[#070D18] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#F59E0B]"
+                placeholder="e.g. AgroAI Champions"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-white outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-gray-400 mb-1 font-medium">Tagline / Mission Pitch</label>
+              <label className="block text-gray-300 font-bold mb-1">Official SIH Theme *</label>
+              <select
+                value={formData.sihTheme}
+                onChange={(e) => setFormData({ ...formData, sihTheme: e.target.value })}
+                className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-white outline-none cursor-pointer"
+              >
+                {SIH_THEMES.map(theme => (
+                  <option key={theme} value={theme}>{theme}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-gray-300 font-bold mb-1">SIH Problem Statement Code *</label>
               <input
                 type="text"
-                placeholder="e.g. Building edge AI computer vision models for rural Indian farmers"
-                value={form.tagline}
-                onChange={(e) => setForm({ ...form, tagline: e.target.value })}
-                className="w-full bg-[#070D18] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#F59E0B]"
+                required
+                placeholder="e.g. SIH1420"
+                value={formData.psCode}
+                onChange={(e) => setFormData({ ...formData, psCode: e.target.value })}
+                className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-white outline-none font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-gray-400 mb-1 font-medium">Detailed Project & Team Pitch *</label>
-              <textarea
-                rows="4"
-                required
-                placeholder="Describe your technical architecture, expected prototype deliverables for SIH evaluation, and what specific gaps you need help filling..."
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="w-full bg-[#070D18] border border-gray-700/80 rounded-xl p-3.5 text-white focus:outline-none focus:border-[#F59E0B]"
+              <label className="block text-gray-300 font-bold mb-1">Category Edition</label>
+              <select
+                value={formData.categoryEdition}
+                onChange={(e) => setFormData({ ...formData, categoryEdition: e.target.value })}
+                className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-white outline-none cursor-pointer"
+              >
+                <option value="Software Edition">Software Edition</option>
+                <option value="Hardware Edition">Hardware Edition</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-gray-300 font-bold mb-1">Ministry / Organization</label>
+              <input
+                type="text"
+                placeholder="e.g. Ministry of Agriculture"
+                value={formData.organization}
+                onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-white outline-none"
               />
             </div>
           </div>
 
-          {/* SECTION 2: Required Squad Vacancies */}
-          <div className="bg-[#0B132B]/90 border border-gray-800 rounded-2xl p-6 md:p-8 shadow-2xl relative space-y-4 backdrop-blur-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-800/80">
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                <span>👥</span> <span>2. Required Squad Vacancies</span>
-              </div>
-              <span className="text-[10px] font-mono text-[#FBBF24] bg-[#261E0C] border border-[#785412] px-2.5 py-0.5 rounded font-bold">
-                Current Squad Plan: {vacancies.length + 1}/6 Members
-              </span>
-            </div>
+          <div>
+            <label className="block text-gray-300 font-bold mb-1">Problem Statement Title *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. AI-driven Pest Detection and Real-time Crop Advisory"
+              value={formData.problemStatementTitle}
+              onChange={(e) => setFormData({ ...formData, problemStatementTitle: e.target.value })}
+              className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-white outline-none"
+            />
+          </div>
 
+          <div>
+            <label className="block text-gray-300 font-bold mb-1">Squad Description & Approach *</label>
+            <textarea
+              rows="3"
+              required
+              placeholder="Explain your approach, architecture, and team strategy..."
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-400 rounded-xl p-3 text-white outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-300 font-bold mb-1.5 flex items-center justify-between">
+              <span>Required Role Vacancies</span>
+              <span className="text-[10px] text-gray-400 font-mono">Max 6 Total Members</span>
+            </label>
             <div className="flex gap-2">
-              <select
-                value={selectedRoleInput}
-                onChange={(e) => setSelectedRoleInput(e.target.value)}
-                className="flex-1 bg-[#070D18] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#F59E0B] cursor-pointer"
-              >
-                <option value="IoT & Hardware Engineer">IoT & Hardware Engineer</option>
-                <option value="Backend Developer">Backend Developer</option>
-                <option value="Frontend Developer">Frontend Developer</option>
-                <option value="AI/ML Engineer">AI/ML Engineer</option>
-                <option value="UI/UX Designer">UI/UX Designer</option>
-                <option value="Cybersecurity Specialist">Cybersecurity Specialist</option>
-              </select>
+              <input
+                type="text"
+                placeholder="e.g. Backend Dev, PPT Specialist, UI/UX"
+                value={newVacancyRole}
+                onChange={(e) => setNewVacancyRole(e.target.value)}
+                className="flex-1 bg-[#070D18] border border-[#334155] rounded-xl px-3.5 py-2 text-white outline-none"
+              />
               <button
                 type="button"
                 onClick={handleAddVacancy}
-                className="bg-[#FF7A00] hover:bg-[#E06D00] text-black font-bold px-4 py-2.5 rounded-xl cursor-pointer"
+                className="bg-amber-500 text-black font-black px-4 py-2 rounded-xl cursor-pointer"
               >
-                + Add Role Vacancy
+                + Add Vacancy
               </button>
             </div>
-
-            <div className="space-y-2 pt-2">
-              {/* Leader Row */}
-              <div className="bg-[#18150D] border border-amber-900/40 p-3 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-white">{user.name || 'Vikramaditya Rathore'}</span>
-                  <span className="text-[10px] text-amber-400 font-mono">(Leader)</span>
-                </div>
-                <span className="text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">Filled</span>
-              </div>
-
-              {/* Dynamic Vacancy Rows */}
-              {vacancies.map((v, idx) => (
-                <div key={idx} className="bg-[#070D18] border border-gray-800 p-3 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-white block">{v.roleName}</span>
-                    <span className="text-[10px] text-amber-400 font-mono">1 Vacancy to Recruit</span>
-                  </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {formData.vacancies.map((v, idx) => (
+                <span
+                  key={idx}
+                  className="bg-[#17130A] border border-[#F59E0B]/60 text-[#FBBF24] text-xs font-mono px-3 py-1 rounded-xl flex items-center gap-2"
+                >
+                  <span>⚠️ {v.roleName}</span>
                   <button
                     type="button"
                     onClick={() => handleRemoveVacancy(idx)}
-                    className="text-gray-500 hover:text-rose-400 font-bold p-1 cursor-pointer"
+                    className="text-gray-400 hover:text-rose-400 cursor-pointer font-bold"
                   >
-                    🗑️
+                    ✕
                   </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* SECTION 3: Critical Technical Skills */}
-          <div className="bg-[#0B132B]/90 border border-gray-800 rounded-2xl p-6 md:p-8 shadow-2xl relative space-y-4 backdrop-blur-xl">
-            <div className="flex items-center gap-2 text-sm font-bold text-white pb-3 border-b border-gray-800/80">
-              <span>&lt;/&gt;</span> <span>3. Critical Technical Skills for Matching Engine</span>
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="e.g. PyTorch, YOLO, React, ROS..."
-                value={skillInput}
-                onChange={(e) => setSkillInput(e.target.value)}
-                className="flex-1 bg-[#070D18] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#F59E0B]"
-              />
-              <select
-                value={skillPriority}
-                onChange={(e) => setSkillPriority(e.target.value)}
-                className="bg-[#070D18] border border-gray-700/80 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-[#F59E0B] cursor-pointer"
-              >
-                <option value="CRITICAL">🔴 Critical (Must Have)</option>
-                <option value="PREFERRED">🟡 Preferred</option>
-              </select>
-              <button
-                type="button"
-                onClick={handleAddSkill}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl cursor-pointer"
-              >
-                + Add Skill
-              </button>
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-2">
-              {criticalSkills.map((s, idx) => (
-                <span
-                  key={idx}
-                  className={`border px-3 py-1 rounded-lg text-xs font-mono flex items-center gap-2 ${
-                    s.priority === 'CRITICAL'
-                      ? 'bg-rose-950/40 border-rose-800/60 text-rose-300'
-                      : 'bg-amber-950/40 border-amber-800/60 text-amber-300'
-                  }`}
-                >
-                  <span>{s.skillName}</span>
-                  <span className="text-[9px] uppercase font-bold">{s.priority}</span>
-                  <button type="button" onClick={() => handleRemoveSkill(idx)} className="text-gray-400 hover:text-white font-bold cursor-pointer">✕</button>
                 </span>
               ))}
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => window.history.back()}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-6 py-3.5 rounded-xl cursor-pointer"
-            >
-              Cancel
-            </button>
+          <div>
+            <label className="block text-gray-300 font-bold mb-1.5">Critical Tech Skills Needed</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="e.g. React, PyTorch, Canva, Docker"
+                value={newSkillName}
+                onChange={(e) => setNewSkillName(e.target.value)}
+                className="flex-1 bg-[#070D18] border border-[#334155] rounded-xl px-3.5 py-2 text-white outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddSkill}
+                className="bg-[#0F172A] border border-[#334155] text-white font-bold px-4 py-2 rounded-xl hover:bg-[#1E293B] cursor-pointer"
+              >
+                + Add Skill
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {formData.criticalSkills.map((s, idx) => (
+                <span
+                  key={idx}
+                  className="bg-[#070D18] border border-[#334155] text-[#CBD5E1] text-xs font-mono px-3 py-1 rounded-xl flex items-center gap-2"
+                >
+                  <span>⚡ {s.skillName}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSkill(idx)}
+                    className="text-gray-400 hover:text-rose-400 cursor-pointer font-bold"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-[#1E293B]">
             <button
               type="submit"
-              className="bg-[#FF7A00] hover:bg-[#E06D00] text-black font-extrabold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 cursor-pointer"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs py-3.5 rounded-xl shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-50"
             >
-              ⚡ Launch Squad & Find Teammates
+              {loading ? 'Publishing Squad...' : '⚡ Publish Squad & Open Vacancies'}
             </button>
           </div>
 

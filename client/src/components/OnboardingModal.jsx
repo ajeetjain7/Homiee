@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import toast from 'react-hot-toast';
+import api from '../services/api';
 
 const POPULAR_CAPABILITIES = [
   'PPT Making & Pitch Deck',
@@ -34,8 +34,6 @@ const SIH_THEMES = [
   'Transportation & Logistics',
   'Open Innovation / Miscellaneous'
 ];
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const OnboardingModal = ({ user, onComplete }) => {
   const navigate = useNavigate();
@@ -134,7 +132,6 @@ const OnboardingModal = ({ user, onComplete }) => {
     setLoading(true);
 
     const payload = {
-      userId: user?._id || 'user_' + Date.now(),
       ...formData,
       photoUrl: user?.photoUrl || user?.avatar || formData.photoUrl || '',
       avatar: user?.avatar || user?.photoUrl || formData.avatar || '',
@@ -144,7 +141,7 @@ const OnboardingModal = ({ user, onComplete }) => {
     };
 
     try {
-      const res = await axios.put(`${API_BASE}/api/auth/profile`, payload);
+      const res = await api.put('/api/auth/profile', payload);
       if (res.data.token) {
         localStorage.setItem('token', res.data.token);
       }
