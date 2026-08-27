@@ -398,6 +398,14 @@ router.get('/teammates', async (req, res) => {
       });
     }
 
+    // Ensure only users with complete profiles appear in teammate discovery
+    conditions.push({
+      $or: [
+        { profileComplete: true },
+        { isProfileComplete: true }
+      ]
+    });
+
     const query = conditions.length > 0 ? { $and: conditions } : {};
 
     const teammates = await User.find(query)
@@ -426,12 +434,22 @@ router.put('/profile', async (req, res) => {
       updateData.yearAndBranch = `${updateData.year} • ${updateData.classBranch}${updateData.section ? ` (${updateData.section})` : ''}`;
     }
 
+    // Validate required fields for teammate card discovery
+    const hasRequired = Boolean(
+      updateData.name &&
+      updateData.college &&
+      updateData.classBranch &&
+      updateData.year &&
+      ((updateData.technicalSkills && updateData.technicalSkills.length > 0) || (updateData.capabilities && updateData.capabilities.length > 0)) &&
+      (updateData.about && updateData.about.trim().length > 0)
+    );
+
     // Recalculate SIH Readiness Score
     updateData.sihReadinessScore = calculateScore(updateData);
     
-    // Set both completion flags to true
-    updateData.profileComplete = true;
-    updateData.isProfileComplete = true;
+    // Set completion flags based on required data
+    updateData.profileComplete = hasRequired;
+    updateData.isProfileComplete = hasRequired;
 
     // Finds user by MongoDB _id and updates with new fields
     const updatedUser = await User.findByIdAndUpdate(
@@ -448,7 +466,9 @@ router.put('/profile', async (req, res) => {
 
     res.status(200).json({
       ...updatedUser.toObject(),
-      token
+      token,
+      profileComplete: updatedUser.profileComplete,
+      isProfileComplete: updatedUser.isProfileComplete
     });
   } catch (error) {
     console.error('Update Profile Error:', error);

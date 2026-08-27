@@ -531,4 +531,69 @@ router.delete('/:teamId', async (req, res, next) => {
   }
 });
 
+// 8. GET SQUAD CHAT MESSAGES (Persistent History)
+router.get('/:teamId/messages', async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const team = await Team.findById(teamId).select('messages').lean();
+    if (!team) return res.status(404).json({ message: 'Squad not found.' });
+
+    const formattedMessages = (team.messages || []).map(m => ({
+      _id: m._id ? m._id.toString() : `msg_${Date.now()}`,
+      teamId,
+      message: m.message,
+      user: m.user,
+      createdAt: m.createdAt || new Date().toISOString()
+    }));
+
+    res.status(200).json(formattedMessages);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// 9. POST SQUAD CHAT MESSAGE (Persistent Message Dispatch)
+router.post('/:teamId/messages', async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const { message, user } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ message: 'Message content is required.' });
+    }
+
+    const msgDoc = {
+      user: {
+        _id: user?._id || 'anonymous',
+        name: user?.name || 'Teammate',
+        email: user?.email || '',
+        avatar: user?.avatar || user?.photoUrl || '',
+        role: user?.primaryRole || user?.role || 'Member'
+      },
+      message: message.trim(),
+      createdAt: new Date()
+    };
+
+    const team = await Team.findByIdAndUpdate(
+      teamId,
+      { $push: { messages: msgDoc } },
+      { new: true }
+    );
+
+    if (!team) return res.status(404).json({ message: 'Squad not found.' });
+
+    const savedMsg = team.messages[team.messages.length - 1];
+
+    res.status(201).json({
+      _id: savedMsg._id.toString(),
+      teamId,
+      message: savedMsg.message,
+      user: savedMsg.user,
+      createdAt: savedMsg.createdAt.toISOString()
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

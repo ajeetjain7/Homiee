@@ -41,6 +41,19 @@ const teamSchema = new mongoose.Schema({
     proofOfWork: String,
     status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
     createdAt: { type: Date, default: Date.now }
+  }],
+  
+  // Real-time Squad Chat Messages Persistence
+  messages: [{
+    user: {
+      _id: String,
+      name: String,
+      email: String,
+      avatar: String,
+      role: String
+    },
+    message: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
   }]
 }, { timestamps: true });
 

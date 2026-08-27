@@ -35,6 +35,8 @@ const SIH_THEMES = [
   'Open Innovation / Miscellaneous'
 ];
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const OnboardingModal = ({ user, onComplete }) => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -60,6 +62,28 @@ const OnboardingModal = ({ user, onComplete }) => {
   });
 
   const [customSkill, setCustomSkill] = useState('');
+
+  // Calculate live Profile Completion Percentage & Checklist
+  const calculateCompleteness = () => {
+    let score = 0;
+    const items = {
+      academics: Boolean(formData.name && formData.college && formData.classBranch && formData.year),
+      skills: Boolean(formData.primaryRole && formData.technicalSkills.length > 0),
+      capabilities: Boolean(formData.capabilities.length > 0),
+      about: Boolean(formData.about.trim().length >= 10),
+      credentials: Boolean(formData.github || formData.linkedin || formData.portfolio)
+    };
+
+    if (items.academics) score += 30;
+    if (items.skills) score += 25;
+    if (items.capabilities) score += 15;
+    if (items.about) score += 20;
+    if (items.credentials) score += 10;
+
+    return { percentage: Math.min(score, 100), items };
+  };
+
+  const { percentage: completionPercent, items: completionItems } = calculateCompleteness();
 
   const toggleCapability = (cap) => {
     setFormData(prev => {
@@ -95,6 +119,18 @@ const OnboardingModal = ({ user, onComplete }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.name.trim() || !formData.college.trim() || !formData.classBranch.trim()) {
+      toast.error('Please complete required academic fields in Step 1.');
+      setStep(1);
+      return;
+    }
+    if (!formData.about.trim()) {
+      toast.error('Please provide a brief bio/pitch in Step 3.');
+      setStep(3);
+      return;
+    }
+
     setLoading(true);
 
     const payload = {
@@ -108,12 +144,12 @@ const OnboardingModal = ({ user, onComplete }) => {
     };
 
     try {
-      const res = await axios.put('http://localhost:5000/api/auth/profile', payload);
+      const res = await axios.put(`${API_BASE}/api/auth/profile`, payload);
       if (res.data.token) {
         localStorage.setItem('token', res.data.token);
       }
       localStorage.setItem('userInfo', JSON.stringify(res.data));
-      toast.success('🎉 Preferences saved! Your teammate card is now live!');
+      toast.success('🎉 Profile completed! Your teammate card is now live across SIH Finder!');
       if (onComplete) onComplete(res.data);
       navigate('/teammates');
     } catch (err) {
@@ -139,13 +175,27 @@ const OnboardingModal = ({ user, onComplete }) => {
               ⚡
             </div>
             <div>
-              <h2 className="text-base font-black text-white tracking-tight">Complete Your Innovator Profile</h2>
-              <p className="text-[11px] font-mono text-gray-400">Unlock SIH Squad Discovery, Join Requests & Your Live Teammate Card</p>
+              <h2 className="text-base font-black text-white tracking-tight">Complete Your Profile</h2>
+              <p className="text-[11px] font-mono text-gray-400">Tell us about yourself so we can find the right teammates for you.</p>
             </div>
           </div>
-          <span className="text-[10px] font-mono font-bold bg-[#261E0C] border border-[#785412] text-[#FBBF24] px-3 py-1 rounded-full uppercase">
-            Step {step} of 3
-          </span>
+          
+          <div className="flex items-center gap-3">
+            {/* Live Progress Indicator */}
+            <div className="text-right hidden sm:block">
+              <span className="text-[10px] font-mono font-bold text-[#F59E0B] block">{completionPercent}% COMPLETE</span>
+              <div className="w-24 bg-gray-800 h-1.5 rounded-full overflow-hidden mt-0.5">
+                <div 
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 h-full transition-all duration-300" 
+                  style={{ width: `${completionPercent}%` }} 
+                />
+              </div>
+            </div>
+
+            <span className="text-[10px] font-mono font-bold bg-[#261E0C] border border-[#785412] text-[#FBBF24] px-3 py-1 rounded-full uppercase">
+              Step {step} of 3
+            </span>
+          </div>
         </div>
 
         {/* Step Indicator Bar */}
@@ -390,12 +440,18 @@ const OnboardingModal = ({ user, onComplete }) => {
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">
-                  About You & Teammate Pitch *
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-mono text-gray-400 font-bold uppercase">
+                    About You & Teammate Pitch *
+                  </label>
+                  <span className={`text-[10px] font-mono ${formData.about.length >= 480 ? 'text-rose-400 font-bold' : 'text-gray-400'}`}>
+                    {formData.about.length} / 500 characters
+                  </span>
+                </div>
                 <textarea
                   rows={3}
                   required
+                  maxLength={500}
                   value={formData.about}
                   onChange={(e) => setFormData({ ...formData, about: e.target.value })}
                   placeholder="Introduce yourself! E.g. Passionate developer and pitch deck creator with 3 hackathons experience. Expert in fullstack and PPT presentations..."

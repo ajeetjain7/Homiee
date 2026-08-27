@@ -25,13 +25,13 @@ const extractUserId = (req) => {
 // 1. POST /api/requests — Send an Invite to a candidate or Join Request to a team
 router.post('/', async (req, res, next) => {
   try {
-    console.log('📌 [LOG POINT 1: POST /api/requests RECEIVED BODY]:', req.body);
-
     const { 
       fromUserId, 
       fromUserName, 
+      fromUserEmail,
       toUserId, 
       toUserName, 
+      toUserEmail,
       teamId, 
       teamName, 
       psCode, 
@@ -63,11 +63,26 @@ router.post('/', async (req, res, next) => {
       }
     }
 
-    // Resolve sender user info
+    // Resolve sender user info and email
     let resolvedSenderName = fromUserName;
-    if (!resolvedSenderName && mongoose.Types.ObjectId.isValid(callerId)) {
+    let resolvedFromEmail = fromUserEmail || '';
+    if (callerId && mongoose.Types.ObjectId.isValid(callerId)) {
       const sender = await User.findById(callerId);
-      if (sender) resolvedSenderName = sender.name;
+      if (sender) {
+        resolvedSenderName = resolvedSenderName || sender.name;
+        resolvedFromEmail = resolvedFromEmail || sender.email;
+      }
+    }
+
+    // Resolve recipient user info and email
+    let resolvedToName = toUserName;
+    let resolvedToEmail = toUserEmail || '';
+    if (toUserId && mongoose.Types.ObjectId.isValid(toUserId)) {
+      const recipient = await User.findById(toUserId);
+      if (recipient) {
+        resolvedToName = resolvedToName || recipient.name;
+        resolvedToEmail = resolvedToEmail || recipient.email;
+      }
     }
 
     // Check for existing duplicate pending request
@@ -85,8 +100,10 @@ router.post('/', async (req, res, next) => {
     const newRequest = await Request.create({
       fromUserId: callerId,
       fromUserName: resolvedSenderName || 'Squad Leader',
+      fromUserEmail: (resolvedFromEmail || '').toLowerCase().trim(),
       toUserId,
-      toUserName: toUserName || 'Innovator',
+      toUserName: resolvedToName || 'Innovator',
+      toUserEmail: (resolvedToEmail || '').toLowerCase().trim(),
       teamId,
       teamName: resolvedTeamName || 'SIH Squad',
       psCode: resolvedPsCode || 'SIH2026',
@@ -94,18 +111,6 @@ router.post('/', async (req, res, next) => {
       type: type || 'invite',
       message: message || 'You have been invited to join our SIH 2026 squad!',
       status: 'pending'
-    });
-
-    console.log('📌 [LOG POINT 2: SAVED MONGODB REQUEST DOC]:', {
-      _id: newRequest._id,
-      fromUserId: newRequest.fromUserId,
-      fromUserName: newRequest.fromUserName,
-      toUserId: newRequest.toUserId,
-      toUserName: newRequest.toUserName,
-      teamId: newRequest.teamId,
-      teamName: newRequest.teamName,
-      status: newRequest.status,
-      type: newRequest.type
     });
 
     res.status(201).json(newRequest);
@@ -142,7 +147,7 @@ router.get('/incoming', async (req, res, next) => {
       if (u) {
         userIds.push(u._id);
         userIds.push(u._id.toString());
-        if (u.email) userIds.push(u.email);
+        if (u.email) userIds.push(u.email.toLowerCase().trim());
       }
     }
     if (userEmail) {
@@ -158,6 +163,7 @@ router.get('/incoming', async (req, res, next) => {
       if (u) {
         userIds.push(u._id);
         userIds.push(u._id.toString());
+        if (u.email) userIds.push(u.email.toLowerCase().trim());
       }
       userIds.push(userName.trim());
     }
@@ -165,7 +171,8 @@ router.get('/incoming', async (req, res, next) => {
     // Find pending requests targeting this user
     const orConditions = [
       { toUserId: { $in: userIds } },
-      { toUserName: { $in: userIds } }
+      { toUserName: { $in: userIds } },
+      { toUserEmail: { $in: userIds } }
     ];
     if (userName) {
       orConditions.push({ toUserName: { $regex: new RegExp(`^${userName.trim()}$`, 'i') } });
@@ -178,12 +185,6 @@ router.get('/incoming', async (req, res, next) => {
       ]
     }).sort({ createdAt: -1 }).lean();
 
-    console.log('📌 [LOG POINT 3: GET /api/requests/incoming QUERY RESULT]:', {
-      queriedUserIds: userIds,
-      foundCount: requests.length,
-      requestsSummary: requests.map(r => ({ id: r._id, from: r.fromUserName, team: r.teamName, status: r.status }))
-    });
-
     res.status(200).json(requests);
   } catch (error) {
     console.error('❌ [GET /api/requests/incoming] Error:', error);
@@ -191,12 +192,16 @@ router.get('/incoming', async (req, res, next) => {
   }
 });
 
-// 3. GET /api/requests/sent — Fetch sent invites/requests by the user
+// 3. GET /api/requests/sent — Fetch all sent invites and join requests by the authenticated user
 router.get('/sent', async (req, res, next) => {
   try {
     const callerId = extractUserId(req);
     const userEmail = req.query.email;
     const userName = req.query.userName;
+
+    if (!callerId && !userEmail && !userName) {
+      return res.status(400).json({ message: 'User identification required.' });
+    }
 
     let userIds = [];
     if (callerId) {
@@ -206,14 +211,73 @@ router.get('/sent', async (req, res, next) => {
         userIds.push(new mongoose.Types.ObjectId(callerId));
       }
     }
-    if (userEmail) userIds.push(userEmail.toLowerCase().trim());
-    if (userName) userIds.push(userName.trim());
 
-    const requests = await Request.find({
-      fromUserId: { $in: userIds }
+    // Look up User in MongoDB to gather all identifier aliases (ObjectId, string ID, real Gmail)
+    if (callerId && mongoose.Types.ObjectId.isValid(callerId)) {
+      const u = await User.findById(callerId);
+      if (u) {
+        userIds.push(u._id);
+        userIds.push(u._id.toString());
+        if (u.email) userIds.push(u.email.toLowerCase().trim());
+      }
+    }
+    if (userEmail) {
+      const u = await User.findOne({ email: userEmail.toLowerCase().trim() });
+      if (u) {
+        userIds.push(u._id);
+        userIds.push(u._id.toString());
+      }
+      userIds.push(userEmail.toLowerCase().trim());
+    }
+    if (userName) {
+      const u = await User.findOne({ name: userName.trim() });
+      if (u) {
+        userIds.push(u._id);
+        userIds.push(u._id.toString());
+        if (u.email) userIds.push(u.email.toLowerCase().trim());
+      }
+      userIds.push(userName.trim());
+    }
+
+    // 1. Find all direct invites and requests sent by this user from Request collection
+    const sentDirectRequests = await Request.find({
+      $or: [
+        { fromUserId: { $in: userIds } },
+        { fromUserName: { $in: userIds } },
+        { fromUserEmail: { $in: userIds } }
+      ]
     }).sort({ createdAt: -1 }).lean();
 
-    res.status(200).json(requests);
+    // 2. Find any squad join applications sent by this user in Team.requests
+    let teamApplications = [];
+    try {
+      const teamsWithMyApplications = await Team.find({
+        'requests.user': { $in: userIds }
+      }).select('name psCode requests').lean();
+
+      teamApplications = teamsWithMyApplications.flatMap(t => 
+        (t.requests || []).filter(r => userIds.some(uid => (r.user?._id || r.user || '').toString() === uid.toString())).map(r => ({
+          _id: r._id,
+          teamId: t._id,
+          teamName: t.name,
+          psCode: t.psCode,
+          role: r.role || 'Contributor',
+          type: 'join_request',
+          message: r.pitchNote || r.proofOfWork || '',
+          toUserName: `${t.name} Squad`,
+          status: r.status || 'pending',
+          createdAt: r.createdAt || new Date()
+        }))
+      );
+    } catch {
+      // ignore
+    }
+
+    const allSent = [...sentDirectRequests, ...teamApplications].sort(
+      (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    );
+
+    res.status(200).json(allSent);
   } catch (error) {
     console.error('❌ [GET /api/requests/sent] Error:', error);
     next(error);

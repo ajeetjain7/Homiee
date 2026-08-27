@@ -5,6 +5,8 @@ import toast from 'react-hot-toast';
 import { io } from 'socket.io-client';
 import CreateTeamModal from '../components/CreateTeamModal';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const MyTeam = ({ currentUser }) => {
   const [teams, setTeams] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
@@ -43,7 +45,7 @@ const MyTeam = ({ currentUser }) => {
       let fetchedTeams = [];
 
       try {
-        const res = await axios.get('http://localhost:5000/api/teams/team', config);
+        const res = await axios.get(`${API_BASE}/api/teams/team`, config);
         if (res.data?.teams && Array.isArray(res.data.teams) && res.data.teams.length > 0) {
           fetchedTeams = res.data.teams;
         } else if (res.data?.team) {
@@ -52,7 +54,7 @@ const MyTeam = ({ currentUser }) => {
       } catch (err) {
         console.warn('API /team error, trying /my-team:', err);
         try {
-          const res2 = await axios.get('http://localhost:5000/api/teams/my-team', config);
+          const res2 = await axios.get(`${API_BASE}/api/teams/my-team`, config);
           if (res2.data?.teams && Array.isArray(res2.data.teams)) {
             fetchedTeams = res2.data.teams;
           } else if (res2.data?.team) {
@@ -65,7 +67,7 @@ const MyTeam = ({ currentUser }) => {
 
       // Fallback: Check all teams to ensure nothing is missed
       if (fetchedTeams.length === 0) {
-        const allRes = await axios.get('http://localhost:5000/api/teams');
+        const allRes = await axios.get(`${API_BASE}/api/teams`);
         const userTeams = allRes.data.filter(t => {
           const isLeaderMatch = 
             (t.leader?._id && t.leader._id === localUser?._id) ||
@@ -91,7 +93,6 @@ const MyTeam = ({ currentUser }) => {
       setTeams(fetchedTeams);
       if (fetchedTeams.length > 0) {
         setSelectedTeamId((prev) => {
-          // keep previous selection if valid, otherwise pick first
           const exists = fetchedTeams.some(t => t._id === prev);
           return exists ? prev : fetchedTeams[0]._id;
         });
@@ -114,12 +115,21 @@ const MyTeam = ({ currentUser }) => {
   // Current active team
   const activeTeam = teams.find(t => t._id === selectedTeamId) || (teams.length > 0 ? teams[0] : null);
 
-  // Socket.io Real-time Squad Chat connection for active team
+  // Load persistent message history via REST & Socket.io for active team
   useEffect(() => {
     if (!activeTeam?._id) return;
 
-    setMessages([]);
-    const socket = io('http://localhost:5000', {
+    // 1. Fetch persistent history from MongoDB via REST endpoint
+    axios.get(`${API_BASE}/api/teams/${activeTeam._id}/messages`)
+      .then(res => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setMessages(res.data);
+        }
+      })
+      .catch(err => console.warn('Could not preload messages:', err.message));
+
+    // 2. Connect Socket.IO for cross-device real-time sync
+    const socket = io(API_BASE, {
       transports: ['websocket', 'polling']
     });
     socketRef.current = socket;
@@ -133,11 +143,17 @@ const MyTeam = ({ currentUser }) => {
     });
 
     socket.on('initial_messages', (initMsgs) => {
-      setMessages(initMsgs || []);
+      if (Array.isArray(initMsgs) && initMsgs.length > 0) {
+        setMessages(initMsgs);
+      }
     });
 
     socket.on('receive_message', (msg) => {
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        // Prevent duplicate rendering of same message ID
+        if (prev.some(m => m._id === msg._id)) return prev;
+        return [...prev, msg];
+      });
     });
 
     socket.on('disconnect', () => {
@@ -154,39 +170,46 @@ const MyTeam = ({ currentUser }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputMessage.trim() || !activeTeam?._id) return;
 
     const messageText = inputMessage.trim();
     setInputMessage('');
 
+    const senderPayload = {
+      _id: localUser?._id || 'user_anon',
+      name: localUser?.name || 'Innovator',
+      email: localUser?.email || '',
+      avatar: localUser?.avatar || localUser?.photoUrl || '',
+      role: localUser?.primaryRole || 'Squad Member'
+    };
+
     if (socketRef.current && socketConnected) {
       socketRef.current.emit('send_message', {
         teamId: activeTeam._id,
         message: messageText,
-        user: {
-          _id: localUser?._id || 'user_anon',
-          name: localUser?.name || 'Innovator',
-          avatar: localUser?.avatar || '',
-          primaryRole: localUser?.primaryRole || 'Squad Member'
-        }
+        user: senderPayload
       });
     } else {
-      // Local fallback if offline
-      const newMsg = {
-        _id: `msg_${Date.now()}`,
-        teamId: activeTeam._id,
-        message: messageText,
-        user: {
-          _id: localUser?._id || 'user_anon',
-          name: localUser?.name || 'Innovator',
-          avatar: localUser?.avatar || '',
-          primaryRole: localUser?.primaryRole || 'Squad Member'
-        },
-        createdAt: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, newMsg]);
+      // Direct REST fallback with MongoDB persistence
+      try {
+        const res = await axios.post(`${API_BASE}/api/teams/${activeTeam._id}/messages`, {
+          message: messageText,
+          user: senderPayload
+        });
+        setMessages(prev => [...prev, res.data]);
+      } catch (err) {
+        console.error('REST Message dispatch error:', err);
+        const fallbackMsg = {
+          _id: `msg_${Date.now()}`,
+          teamId: activeTeam._id,
+          message: messageText,
+          user: senderPayload,
+          createdAt: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, fallbackMsg]);
+      }
     }
   };
 

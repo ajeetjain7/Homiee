@@ -12,6 +12,9 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
+// Essential when hosted behind reverse proxies (Render, Vercel, Nginx) so real user IPs are tracked
+app.set('trust proxy', 1);
+
 // Initialize Socket.io with CORS configuration
 const io = new Server(server, {
   cors: {
@@ -23,35 +26,59 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-// Rate Limiter: Max 200 requests per 15 minutes per IP address
-const limiter = rateLimit({
+// 1. High-Capacity General API Rate Limiter (Allows 3000 requests per 15 min per user/IP)
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 3000,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: 'Too many requests from this IP, please try again later.' }
+  message: { message: 'Too many requests, please try again in a few minutes.' }
 });
-app.use('/api/', limiter);
 
-// In-memory cache for recent messages per team room
+// 2. Headroom Auth Limiter (Allows up to 100 login/register attempts per 5 min per user/IP)
+const authLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many authentication attempts. Please wait 5 minutes.' }
+});
+
+// Apply rate limiters
+app.use('/api/auth/', authLimiter);
+app.use('/api/', apiLimiter);
+
+// In-memory cache for fast message retrieval per team room
 const teamMessages = {};
 
 // Socket.io Real-time Team Chat
 io.on('connection', (socket) => {
   // Join squad chat room
-  socket.on('join_team', ({ teamId, user }) => {
+  socket.on('join_team', async ({ teamId, user }) => {
     if (!teamId) return;
     const room = `team_${teamId}`;
     socket.join(room);
     
-    // Send existing recent messages in this team room to the connected member
-    if (teamMessages[room]) {
-      socket.emit('initial_messages', teamMessages[room]);
+    try {
+      const Team = require('./models/Team');
+      const teamDoc = await Team.findById(teamId).select('messages').lean();
+      const dbMessages = (teamDoc?.messages || []).map(m => ({
+        _id: m._id ? m._id.toString() : `msg_${Date.now()}`,
+        teamId,
+        message: m.message,
+        user: m.user,
+        createdAt: m.createdAt || new Date().toISOString()
+      }));
+      socket.emit('initial_messages', dbMessages);
+    } catch {
+      if (teamMessages[room]) {
+        socket.emit('initial_messages', teamMessages[room]);
+      }
     }
   });
 
   // Send message to squad chat room
-  socket.on('send_message', ({ teamId, message, user }) => {
+  socket.on('send_message', async ({ teamId, message, user }) => {
     if (!teamId || !message || !message.trim()) return;
     const room = `team_${teamId}`;
     const msgPayload = {
@@ -61,21 +88,38 @@ io.on('connection', (socket) => {
       user: {
         _id: user?._id || 'anonymous',
         name: user?.name || 'Teammate',
-        avatar: user?.avatar || '',
-        role: user?.primaryRole || 'Member'
+        avatar: user?.avatar || user?.photoUrl || '',
+        role: user?.primaryRole || user?.role || 'Member'
       },
       createdAt: new Date().toISOString()
     };
 
+    // 1. Save to MongoDB
+    try {
+      const Team = require('./models/Team');
+      await Team.findByIdAndUpdate(teamId, {
+        $push: {
+          messages: {
+            user: msgPayload.user,
+            message: msgPayload.message,
+            createdAt: new Date(msgPayload.createdAt)
+          }
+        }
+      });
+    } catch (err) {
+      console.warn('Could not persist message to MongoDB:', err.message);
+    }
+
+    // 2. Cache in memory
     if (!teamMessages[room]) {
       teamMessages[room] = [];
     }
     teamMessages[room].push(msgPayload);
-    // Keep max 100 recent messages per room
     if (teamMessages[room].length > 100) {
       teamMessages[room].shift();
     }
 
+    // 3. Emit in real-time to all connected sockets in this squad room
     io.to(room).emit('receive_message', msgPayload);
   });
 });
