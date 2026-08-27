@@ -42,7 +42,7 @@ const Requests = () => {
       // 1. Fetch direct invitations sent to this user from /api/requests/incoming
       try {
         const res = await axios.get('http://localhost:5000/api/requests/incoming', config);
-        console.log('📬 [Requests.jsx] Incoming invitations received from /api/requests/incoming:', res.data);
+        console.log('📌 [LOG POINT 4: FRONTEND RECEIVED INCOMING REQUESTS]:', res.data);
         setIncomingInvites(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.warn('Could not fetch /api/requests/incoming:', err);

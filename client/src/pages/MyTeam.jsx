@@ -476,9 +476,18 @@ const MyTeam = ({ currentUser }) => {
 
                 {/* Member Name & Academic Details */}
                 <div className="flex items-start gap-3.5">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black flex items-center justify-center text-base shadow-md">
-                    {memberInitials}
-                  </div>
+                  {member.photoUrl || member.avatar ? (
+                    <img
+                      src={member.photoUrl || member.avatar}
+                      alt={memberName}
+                      className="w-12 h-12 rounded-xl object-cover border border-[#F59E0B]/50 shadow-md"
+                      onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black flex items-center justify-center text-base shadow-md">
+                      {memberInitials}
+                    </div>
+                  )}
 
                   <div className="space-y-1 flex-1">
                     <h3 className="font-black text-white text-base leading-tight">{memberName}</h3>

@@ -137,9 +137,18 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
                 to="/profile" 
                 className="flex items-center gap-2 bg-[#0B132B] border border-[#1E293B] hover:border-[#334155] px-3 py-1.5 rounded-xl transition-all"
               >
-                <div className="w-6 h-6 rounded-md bg-[#2DD4BF] text-black font-extrabold text-[10px] flex items-center justify-center">
-                  {userInitials}
-                </div>
+                {user?.photoUrl || user?.avatar ? (
+                  <img
+                    src={user.photoUrl || user.avatar}
+                    alt={user?.name || 'Avatar'}
+                    className="w-6 h-6 rounded-md object-cover border border-amber-500/50"
+                    onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-md bg-[#2DD4BF] text-black font-extrabold text-[10px] flex items-center justify-center">
+                    {userInitials}
+                  </div>
+                )}
                 <span className="text-xs font-bold text-white max-w-[120px] truncate">{user?.name || 'Innovator'}</span>
                 <span className="text-xs text-[#94A3B8]">▾</span>
               </NavLink>

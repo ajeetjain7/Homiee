@@ -106,6 +106,7 @@ function App() {
         {/* 2. Public Auth Pages */}
         <Route path="/login" element={<Login />} />
         <Route path="/oauth/callback" element={<OAuthCallback />} />
+        <Route path="/auth/callback" element={<OAuthCallback />} />
 
         {/* 3. Gated App Pages (Behind ProtectedRoute) */}
         <Route 

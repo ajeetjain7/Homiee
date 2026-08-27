@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 import toast from 'react-hot-toast';
 
 const OAuthCallback = () => {
@@ -7,34 +8,59 @@ const OAuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const userParam = searchParams.get('user');
-    const isNew = searchParams.get('isNew') === 'true';
+    const handleAuth = async () => {
+      const token = searchParams.get('token');
+      const userParam = searchParams.get('user');
+      const isNew = searchParams.get('isNew') === 'true';
 
-    if (token && userParam) {
-      try {
-        const user = JSON.parse(decodeURIComponent(userParam));
-        localStorage.setItem('token', token);
-        localStorage.setItem('userInfo', JSON.stringify(user));
+      if (token) {
+        try {
+          localStorage.setItem('token', token);
+          let currentUser = null;
 
-        toast.success(`Welcome back, ${user.name || 'Innovator'}!`);
+          if (userParam) {
+            try {
+              currentUser = JSON.parse(decodeURIComponent(userParam));
+              localStorage.setItem('userInfo', JSON.stringify(currentUser));
+            } catch {
+              // ignore json parse error
+            }
+          }
 
-        const isComplete = Boolean(user.profileComplete || user.isProfileComplete);
+          // Fetch fresh user profile from /api/auth/me
+          try {
+            const meRes = await axios.get('http://localhost:5000/api/auth/me', {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (meRes.data) {
+              currentUser = meRes.data;
+              localStorage.setItem('userInfo', JSON.stringify(currentUser));
+            }
+          } catch {
+            // fallback to parsed user
+          }
 
-        if (!isComplete || isNew) {
-          navigate('/teammates', { replace: true, state: { openSetup: true } });
-        } else {
-          navigate('/teammates', { replace: true });
+          toast.success(`Welcome, ${currentUser?.name || 'Innovator'}!`);
+
+          const isComplete = Boolean(currentUser?.profileComplete || currentUser?.isProfileComplete);
+
+          if (!isComplete || isNew) {
+            navigate('/teammates', { replace: true, state: { openSetup: true } });
+          } else {
+            navigate('/teammates', { replace: true });
+          }
+        } catch (err) {
+          console.error('Failed to process OAuth callback:', err);
+          navigate('/login?error=Failed+to+process+login', { replace: true });
         }
-      } catch (err) {
-        console.error('Failed to parse OAuth user param:', err);
-        navigate('/login?error=Failed+to+process+login', { replace: true });
+      } else {
+        const error = searchParams.get('error') || 'Authentication failed';
+        toast.error(decodeURIComponent(error));
+        navigate(`/login?error=${encodeURIComponent(error)}`, { replace: true });
       }
-    } else {
-      const error = searchParams.get('error') || 'Authentication failed';
-      toast.error(decodeURIComponent(error));
-      navigate(`/login?error=${encodeURIComponent(error)}`, { replace: true });
-    }
+    };
+
+    handleAuth();
   }, [searchParams, navigate]);
 
   return (

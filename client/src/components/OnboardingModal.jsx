@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -35,6 +36,7 @@ const SIH_THEMES = [
 ];
 
 const OnboardingModal = ({ user, onComplete }) => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -111,12 +113,14 @@ const OnboardingModal = ({ user, onComplete }) => {
       localStorage.setItem('userInfo', JSON.stringify(res.data));
       toast.success('🎉 Preferences saved! Your teammate card is now live!');
       if (onComplete) onComplete(res.data);
+      navigate('/teammates');
     } catch (err) {
       console.warn('Backend offline or error, saving profile locally:', err);
       const localUser = { ...user, ...payload };
       localStorage.setItem('userInfo', JSON.stringify(localUser));
       toast.success('🎉 Preferences saved! Welcome to SIH Teammate Discovery!');
       if (onComplete) onComplete(localUser);
+      navigate('/teammates');
     } finally {
       setLoading(false);
     }

@@ -25,6 +25,8 @@ const extractUserId = (req) => {
 // 1. POST /api/requests — Send an Invite to a candidate or Join Request to a team
 router.post('/', async (req, res, next) => {
   try {
+    console.log('📌 [LOG POINT 1: POST /api/requests RECEIVED BODY]:', req.body);
+
     const { 
       fromUserId, 
       fromUserName, 
@@ -94,8 +96,17 @@ router.post('/', async (req, res, next) => {
       status: 'pending'
     });
 
-    // Logging saved document right after Request.create() as requested
-    console.log('✅ [POST /api/requests] Saved Request Document:', newRequest);
+    console.log('📌 [LOG POINT 2: SAVED MONGODB REQUEST DOC]:', {
+      _id: newRequest._id,
+      fromUserId: newRequest.fromUserId,
+      fromUserName: newRequest.fromUserName,
+      toUserId: newRequest.toUserId,
+      toUserName: newRequest.toUserName,
+      teamId: newRequest.teamId,
+      teamName: newRequest.teamName,
+      status: newRequest.status,
+      type: newRequest.type
+    });
 
     res.status(201).json(newRequest);
   } catch (error) {
@@ -167,8 +178,11 @@ router.get('/incoming', async (req, res, next) => {
       ]
     }).sort({ createdAt: -1 }).lean();
 
-    // Console.log the query result count during real test as requested
-    console.log(`📬 [GET /api/requests/incoming] Found ${requests.length} incoming requests for user identifiers:`, userIds);
+    console.log('📌 [LOG POINT 3: GET /api/requests/incoming QUERY RESULT]:', {
+      queriedUserIds: userIds,
+      foundCount: requests.length,
+      requestsSummary: requests.map(r => ({ id: r._id, from: r.fromUserName, team: r.teamName, status: r.status }))
+    });
 
     res.status(200).json(requests);
   } catch (error) {

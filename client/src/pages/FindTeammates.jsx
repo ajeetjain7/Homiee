@@ -524,9 +524,18 @@ const FindTeammates = ({ currentUser }) => {
 
               {/* Teammate Header Info */}
               <div className="flex items-start gap-3.5">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black flex items-center justify-center text-base shadow-md">
-                  {initials}
-                </div>
+                {c.photoUrl || c.avatar ? (
+                  <img
+                    src={c.photoUrl || c.avatar}
+                    alt={c.name}
+                    className="w-12 h-12 rounded-xl object-cover border border-[#F59E0B]/50 shadow-md"
+                    onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black flex items-center justify-center text-base shadow-md">
+                    {initials}
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <h3 className="font-black text-white text-base tracking-tight leading-snug">{c.name}</h3>
