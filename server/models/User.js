@@ -12,23 +12,25 @@ const userSchema = new mongoose.Schema({
   section: { type: String, default: 'Section A', trim: true },
   year: { type: String, default: '3rd Year', trim: true },
   yearAndBranch: { type: String, default: '3rd Year • Computer Science', trim: true },
-  gender: { type: String, enum: ['Male', 'Female', 'Other', 'Prefer not to say'], default: 'Prefer not to say', index: true },
+  gender: { type: String, enum: ['Male', 'Female', 'Other', 'Prefer not to say'], default: 'Prefer not to say' },
   about: { type: String, default: '', trim: true },
 
   // Role & Capabilities
-  primaryRole: { type: String, default: 'Fullstack Developer', index: true },
+  primaryRole: { type: String, default: 'Fullstack Developer' },
   capabilities: [{ type: String, trim: true }], // e.g. 'PPT Making', 'Pitch Deck', 'Backend', 'Frontend'
   status: { type: String, enum: ['Looking for Team', 'Team Full', 'Not Available'], default: 'Looking for Team' },
   
-  // Profile Completion Flags (both supported for compatibility)
-  profileComplete: { type: Boolean, default: false, index: true },
-  isProfileComplete: { type: Boolean, default: false, index: true },
+  // Profile Completion Flags
+  profileComplete: { type: Boolean, default: false },
+  isProfileComplete: { type: Boolean, default: false },
+  isPublic: { type: Boolean, default: true },
   
   // High Concurrency Match Metrics
   sihReadinessScore: { type: Number, default: 20 },
   technicalSkills: [{ type: String, trim: true }],
   sihThemes: [{ type: String, trim: true }],
   featuredProjects: [{ title: String, link: String, description: String }],
+  hackathonsCount: { type: Number, default: 0 },
   
   // External Profiles & Credentials
   whatsappNumber: { type: String, default: '' },
@@ -36,6 +38,7 @@ const userSchema = new mongoose.Schema({
   linkedin: { type: String, default: '' },
   portfolio: { type: String, default: '' },
   resumeUrl: { type: String, default: '' },
+  dsaRating: { type: String, default: '' },
   
   // Competitive Programming
   leetcodeRating: { type: String, default: 'N/A' },
@@ -43,10 +46,11 @@ const userSchema = new mongoose.Schema({
   codechefRating: { type: String, default: 'N/A' }
 }, { timestamps: true });
 
-// Explicit Indexes for Fast Search & Matching Queries
+// Explicit Compound & Field Indexes
 userSchema.index({ primaryRole: 1, sihReadinessScore: -1 });
 userSchema.index({ technicalSkills: 1 });
 userSchema.index({ gender: 1 });
+userSchema.index({ isPublic: 1, status: 1 });
 userSchema.index({ profileComplete: 1, isProfileComplete: 1 });
 
 module.exports = mongoose.model('User', userSchema);

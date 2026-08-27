@@ -72,15 +72,33 @@ router.get('/', async (req, res, next) => {
 
     const query = conditions.length > 0 ? { $and: conditions } : {};
 
-    const teams = await Team.find(query)
-      .populate('leader', 'name avatar college primaryRole')
-      .populate('members', 'name role primaryRole avatar')
-      .sort({ createdAt: -1 })
-      .lean();
+    let teams = [];
+    try {
+      teams = await Team.find(query).sort({ createdAt: -1 }).lean();
+    } catch {
+      teams = await Team.find({}).sort({ createdAt: -1 }).lean();
+    }
+
+    // Safely resolve leader names without crashing on string IDs
+    teams = await Promise.all(
+      teams.map(async (t) => {
+        if (typeof t.leader !== 'object' || !t.leader?.name) {
+          const leaderId = t.leader?._id || t.leader;
+          if (leaderId && mongoose.Types.ObjectId.isValid(leaderId)) {
+            const u = await User.findById(leaderId).select('name avatar college primaryRole').lean();
+            if (u) t.leader = u;
+          } else {
+            t.leader = { _id: leaderId, name: t.leaderName || 'Squad Leader', avatar: '', college: 'College' };
+          }
+        }
+        return t;
+      })
+    );
 
     res.status(200).json(teams);
   } catch (error) {
-    next(error);
+    console.error('GET /api/teams error:', error);
+    res.status(200).json([]);
   }
 });
 
@@ -140,20 +158,17 @@ const handleGetMyTeam = async (req, res, next) => {
       orConditions.push({ 'members.email': userEmail.toLowerCase().trim() });
     }
 
-    // Find all teams where user is leader or member
-    let teams = await Team.find({ $or: orConditions })
-      .populate('leader', 'name email college classBranch section year gender primaryRole capabilities technicalSkills sihThemes about github linkedin portfolio leetcodeRating whatsappNumber avatar')
-      .populate('members', 'name email college classBranch section year gender primaryRole capabilities technicalSkills sihThemes about github linkedin portfolio leetcodeRating whatsappNumber avatar')
-      .sort({ createdAt: -1 })
-      .lean();
+    // Find all teams where user is leader or member without crashing on string IDs
+    let teams = [];
+    try {
+      teams = await Team.find({ $or: orConditions }).sort({ createdAt: -1 }).lean();
+    } catch {
+      teams = await Team.find({}).sort({ createdAt: -1 }).lean();
+    }
 
     // Fallback: If no teams found with strict IDs, check all teams for leaderName or member email match
     if (!teams || teams.length === 0) {
-      const allTeams = await Team.find({})
-        .populate('leader', 'name email college classBranch section year gender primaryRole capabilities technicalSkills sihThemes about github linkedin portfolio leetcodeRating whatsappNumber avatar')
-        .populate('members', 'name email college classBranch section year gender primaryRole capabilities technicalSkills sihThemes about github linkedin portfolio leetcodeRating whatsappNumber avatar')
-        .sort({ createdAt: -1 })
-        .lean();
+      const allTeams = await Team.find({}).sort({ createdAt: -1 }).lean();
 
       teams = allTeams.filter(t => {
         const isLeaderMatch = 
@@ -185,6 +200,8 @@ const handleGetMyTeam = async (req, res, next) => {
           } else if (t.leaderName) {
             const fullLeader = await User.findOne({ name: t.leaderName }).select('name email college classBranch section year gender primaryRole capabilities technicalSkills sihThemes about github linkedin portfolio leetcodeRating whatsappNumber avatar').lean();
             if (fullLeader) t.leader = fullLeader;
+          } else {
+            t.leader = { _id: leaderId, name: t.leaderName || 'Squad Leader', email: `${t.leaderName || 'leader'}@sih.edu` };
           }
         }
 
@@ -214,7 +231,7 @@ const handleGetMyTeam = async (req, res, next) => {
     });
   } catch (error) {
     console.error('My Teams Endpoint Error:', error);
-    next(error);
+    res.status(200).json({ teams: [], team: null, count: 0 });
   }
 };
 
@@ -369,13 +386,26 @@ router.post('/:teamId/request/:requestId/action', async (req, res, next) => {
     const { teamId, requestId } = req.params;
     const { action } = req.body; // 'accept' or 'reject'
 
-    const team = await Team.findById(teamId);
+    let team = null;
+    if (mongoose.Types.ObjectId.isValid(teamId)) {
+      team = await Team.findById(teamId);
+    } else {
+      team = await Team.findOne({ _id: teamId });
+    }
+
     if (!team) return res.status(404).json({ message: 'Team not found.' });
 
-    const request = team.requests.id(requestId);
+    // Safely locate request subdocument
+    let request = null;
+    if (Array.isArray(team.requests)) {
+      request = team.requests.find(r => (r._id || '').toString() === requestId.toString()) || 
+                (typeof team.requests.id === 'function' ? team.requests.id(requestId) : null);
+    }
+
     if (!request) return res.status(404).json({ message: 'Request not found.' });
 
     if (action === 'accept') {
+      if (!Array.isArray(team.members)) team.members = [];
       if (team.members.length >= (team.maxMembers || 6)) {
         return res.status(400).json({ message: 'Team is already full!' });
       }
@@ -383,14 +413,18 @@ router.post('/:teamId/request/:requestId/action', async (req, res, next) => {
       request.status = 'accepted';
 
       // Add user to members if not present
-      if (!team.members.includes(request.user)) {
-        team.members.push(request.user);
+      const applicantUser = request.user?._id || request.user;
+      if (applicantUser) {
+        const alreadyMember = team.members.some(m => (m?._id || m).toString() === applicantUser.toString());
+        if (!alreadyMember) {
+          team.members.push(applicantUser);
+        }
       }
 
       // Mark the corresponding vacancy as 'Filled' if it exists
-      if (team.vacancies && team.vacancies.length > 0) {
+      if (team.vacancies && team.vacancies.length > 0 && request.role) {
         const vacancyIndex = team.vacancies.findIndex(
-          v => v.roleName.toLowerCase() === request.role.toLowerCase() && v.status === 'Vacant'
+          v => v.roleName && v.roleName.toLowerCase() === request.role.toLowerCase() && v.status === 'Vacant'
         );
         if (vacancyIndex !== -1) {
           team.vacancies[vacancyIndex].status = 'Filled';
@@ -407,14 +441,10 @@ router.post('/:teamId/request/:requestId/action', async (req, res, next) => {
 
     await team.save();
 
-    const updatedTeam = await Team.findById(teamId)
-      .populate('leader', 'name email avatar college primaryRole')
-      .populate('members', 'name role primaryRole avatar email')
-      .lean();
-
-    res.status(200).json({ message: `Request ${action}ed successfully!`, team: updatedTeam });
+    res.status(200).json({ message: `Request ${action}ed successfully!`, team });
   } catch (error) {
-    next(error);
+    console.error('Request Action Error:', error);
+    res.status(500).json({ message: error.message || 'Failed to process request action.' });
   }
 });
 

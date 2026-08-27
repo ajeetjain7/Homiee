@@ -86,6 +86,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/teams', require('./routes/teams'));
+app.use('/api/requests', require('./routes/requests'));
 
 // Global Error Handling Middleware (Guarantees no unhandled exception crashes server)
 app.use((err, req, res, next) => {

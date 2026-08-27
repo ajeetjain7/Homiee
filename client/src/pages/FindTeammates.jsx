@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -233,8 +234,96 @@ const FindTeammates = ({ currentUser }) => {
     return () => clearTimeout(timer);
   }, [skillSearch, selectedRole, selectedCapability, selectedTheme, selectedYear, selectedGender, selectedPsCode, selectedSkills, localUser?.profileComplete, localUser?.isProfileComplete]);
 
-  const handleInvite = (candidateName) => {
-    toast.success(`🎉 Squad recruitment invite sent to ${candidateName}!`);
+  const [mySquads, setMySquads] = useState([]);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [selectedSquadId, setSelectedSquadId] = useState('');
+  const [inviteRole, setInviteRole] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [sendingInvite, setSendingInvite] = useState(false);
+
+  // Fetch logged in user's squads for inviting
+  const fetchMySquads = async () => {
+    if (!localUser?._id && !localUser?.email) return;
+    try {
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        params: { userId: localUser?._id, email: localUser?.email, userName: localUser?.name }
+      };
+      const res = await axios.get('http://localhost:5000/api/teams/team', config);
+      if (res.data?.teams && res.data.teams.length > 0) {
+        setMySquads(res.data.teams);
+        setSelectedSquadId(res.data.teams[0]._id);
+      } else if (res.data?.team) {
+        setMySquads([res.data.team]);
+        setSelectedSquadId(res.data.team._id);
+      }
+    } catch {
+      // ignore error
+    }
+  };
+
+  useEffect(() => {
+    fetchMySquads();
+  }, [localUser?._id, localUser?.email]);
+
+  const handleOpenInvite = (candidate) => {
+    if (!localUser) {
+      toast.error('Please log in to invite teammates.');
+      return;
+    }
+
+    if (mySquads.length === 0) {
+      toast.error('Please create a squad first via "+ Create Team" to invite teammates.');
+      return;
+    }
+
+    setSelectedCandidate(candidate);
+    setInviteRole(candidate.primaryRole || 'Squad Member');
+    setInviteMessage(`Hi ${candidate.name}! We'd love to have your skills on our SIH 2026 squad.`);
+    if (!selectedSquadId && mySquads.length > 0) {
+      setSelectedSquadId(mySquads[0]._id);
+    }
+    setInviteModalOpen(true);
+  };
+
+  const handleSendInviteSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedCandidate || !selectedSquadId) return;
+
+    const targetSquad = mySquads.find(s => s._id === selectedSquadId) || mySquads[0];
+    if (!targetSquad) return;
+
+    setSendingInvite(true);
+    try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+      const payload = {
+        fromUserId: localUser._id || localUser.id || 'leader_user',
+        fromUserName: localUser.name || 'Squad Leader',
+        toUserId: selectedCandidate._id,
+        toUserName: selectedCandidate.name,
+        teamId: targetSquad._id,
+        teamName: targetSquad.name,
+        psCode: targetSquad.psCode,
+        role: inviteRole || selectedCandidate.primaryRole || 'Squad Member',
+        type: 'invite',
+        message: inviteMessage
+      };
+
+      await axios.post('http://localhost:5000/api/requests', payload, config);
+
+      toast.success(`🎉 Invitation sent to ${selectedCandidate.name} for ${targetSquad.name}!`);
+      setInviteModalOpen(false);
+      setSelectedCandidate(null);
+    } catch (err) {
+      console.error('Send invite error:', err);
+      toast.error(err.response?.data?.message || 'Failed to send invitation.');
+    } finally {
+      setSendingInvite(false);
+    }
   };
 
   return (
@@ -251,12 +340,12 @@ const FindTeammates = ({ currentUser }) => {
         </div>
         
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => window.location.href = '/form-team'} 
+          <Link 
+            to="/team" 
             className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-[#000000] font-black text-xs px-5 py-3 rounded-xl cursor-pointer shadow-lg shadow-amber-500/20"
           >
-            ⚡ Form Squad & Recruit
-          </button>
+            ⚡ View My Squad
+          </Link>
         </div>
       </div>
 
@@ -521,8 +610,8 @@ const FindTeammates = ({ currentUser }) => {
                 </button>
               ) : (
                 <button
-                  onClick={() => handleInvite(c.name)}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-[#000000] font-black text-xs py-2.5 rounded-xl cursor-pointer transition-all shadow-md active:scale-95"
+                  onClick={() => handleOpenInvite(c)}
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-[#000000] font-black text-xs py-2.5 rounded-xl cursor-pointer transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
                 >
                   ⚡ Invite to Squad
                 </button>
@@ -531,6 +620,81 @@ const FindTeammates = ({ currentUser }) => {
           );
         })}
       </div>
+
+      {/* Invite To Squad Modal Popup */}
+      {inviteModalOpen && selectedCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#0B132B] border border-[#F59E0B]/50 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative text-white">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">⚡</span>
+                <h3 className="font-bold text-base text-white">Invite {selectedCandidate.name}</h3>
+              </div>
+              <button 
+                onClick={() => setInviteModalOpen(false)}
+                className="text-gray-400 hover:text-white text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSendInviteSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-gray-400 mb-1 font-medium">Select Your Target Squad *</label>
+                <select
+                  value={selectedSquadId}
+                  onChange={(e) => setSelectedSquadId(e.target.value)}
+                  className="w-full bg-[#070D18] border border-gray-700 rounded-xl p-2.5 text-white outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  {mySquads.map(sq => (
+                    <option key={sq._id} value={sq._id}>
+                      {sq.name} ({sq.psCode || 'SIH2026'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 mb-1 font-medium">Assigned Squad Role</label>
+                <input
+                  type="text"
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  placeholder="e.g. AI / ML Engineer, Backend Developer"
+                  className="w-full bg-[#070D18] border border-gray-700 rounded-xl p-2.5 text-white outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-400 mb-1 font-medium">Invitation Pitch Message</label>
+                <textarea
+                  rows="3"
+                  value={inviteMessage}
+                  onChange={(e) => setInviteMessage(e.target.value)}
+                  className="w-full bg-[#070D18] border border-gray-700 rounded-xl p-2.5 text-white outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setInviteModalOpen(false)}
+                  className="bg-[#070D18] border border-gray-700 text-gray-300 px-4 py-2 rounded-xl hover:bg-gray-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingInvite}
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 text-black font-black px-5 py-2 rounded-xl shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  {sendingInvite ? 'Sending...' : '⚡ Send Invitation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {candidates.length === 0 && !loading && (
         <div className="bg-[#0B132B] border border-[#1E293B] rounded-2xl p-12 text-center space-y-3">

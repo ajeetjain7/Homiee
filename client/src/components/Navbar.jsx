@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import CreateTeamModal from './CreateTeamModal';
 
 const Navbar = ({ user: propUser, onOpenSetup }) => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const localUser = (() => {
     try {
@@ -19,6 +21,30 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
   const user = propUser || localUser;
   const isAuthenticated = Boolean(user && (token || user._id));
   const userInitials = user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'IN';
+
+  // Live polling for unread incoming invitations count
+  useEffect(() => {
+    if (!isAuthenticated || (!user?._id && !user?.email)) return;
+
+    const fetchCount = async () => {
+      try {
+        const config = {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          params: { userId: user._id, email: user.email, userName: user.name }
+        };
+        const res = await axios.get('http://localhost:5000/api/requests/incoming', config);
+        if (Array.isArray(res.data)) {
+          setUnreadCount(res.data.length);
+        }
+      } catch {
+        // silent fallback
+      }
+    };
+
+    fetchCount();
+    const interval = setInterval(fetchCount, 10000);
+    return () => clearInterval(interval);
+  }, [user?._id, user?.email, user?.name, isAuthenticated, token]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -96,11 +122,15 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
 
               <NavLink 
                 to="/requests" 
-                className="p-2 bg-[#0B132B] border border-[#1E293B] hover:border-[#334155] rounded-xl text-[#CBD5E1] hover:text-white transition-all relative"
+                className="p-2 bg-[#0B132B] border border-[#1E293B] hover:border-[#334155] rounded-xl text-[#CBD5E1] hover:text-white transition-all relative flex items-center justify-center"
                 title="Notifications / Requests"
               >
                 🔔
-                <span className="w-2 h-2 rounded-full bg-amber-500 absolute top-1 right-1" />
+                {unreadCount > 0 && (
+                  <span className="bg-[#F59E0B] text-black text-[9px] font-black px-1.5 py-0.2 rounded-full absolute -top-1 -right-1 shadow-sm">
+                    {unreadCount}
+                  </span>
+                )}
               </NavLink>
 
               <NavLink 

@@ -21,41 +21,38 @@ const Login = () => {
     }
   }, [searchParams]);
 
-  // Google OAuth Handler (Direct Backend Redirect + Firebase popup fallback)
+  // Google OAuth Handler (Direct Firebase Popup Auth)
   const handleGoogleLogin = async () => {
-    // Check if backend Google OAuth endpoint is available
+    setLoading(true);
     try {
-      // First try opening the backend Google OAuth redirect
-      window.location.href = 'http://localhost:5000/api/auth/google';
-    } catch (e) {
-      // Fallback to Firebase client-side OAuth
-      try {
-        setLoading(true);
-        const { user, token } = await loginWithGoogle();
-        const res = await axios.post('http://localhost:5000/api/auth/google', { 
-          token,
-          email: user.email,
-          name: user.displayName || 'Student Innovator',
-          avatar: user.photoURL || ''
-        });
+      const { user, token } = await loginWithGoogle();
+      const res = await axios.post('http://localhost:5000/api/auth/google', { 
+        token,
+        email: user.email,
+        name: user.displayName || 'Student Innovator',
+        avatar: user.photoURL || ''
+      });
 
-        localStorage.setItem('token', res.data.token || token);
-        localStorage.setItem('userInfo', JSON.stringify(res.data));
-        
-        toast.success(`Welcome, ${res.data.name || 'Innovator'}!`);
+      localStorage.setItem('token', res.data.token || token);
+      localStorage.setItem('userInfo', JSON.stringify(res.data));
+      
+      toast.success(`Welcome, ${res.data.name || 'Innovator'}!`);
 
-        const isComplete = Boolean(res.data.profileComplete || res.data.isProfileComplete);
-        if (!isComplete) {
-          navigate('/teammates', { state: { openSetup: true } });
-        } else {
-          navigate('/teammates');
-        }
-      } catch (fbErr) {
-        console.error('Google Auth Error:', fbErr);
-        toast.error('Google Sign-In failed. Try Email Login or Quick Demo.');
-      } finally {
-        setLoading(false);
+      const isComplete = Boolean(res.data.profileComplete || res.data.isProfileComplete);
+      if (!isComplete) {
+        navigate('/teammates', { state: { openSetup: true } });
+      } else {
+        navigate('/teammates');
       }
+    } catch (err) {
+      console.error('Google Auth Error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        toast('Google sign-in popup was closed.');
+      } else {
+        toast.error(err.response?.data?.message || err.message || 'Google Sign-In failed. Try Email Login.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
