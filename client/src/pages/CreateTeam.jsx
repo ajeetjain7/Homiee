@@ -61,16 +61,20 @@ const CreateTeam = () => {
     }
 
     try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
       await axios.post('http://localhost:5000/api/teams/create', {
         ...form,
         vacancies,
         criticalSkills,
         userId: user._id || 'user_sih_2026',
-        userName: user.name || 'Vikramaditya Rathore'
-      });
+        userName: user.name || 'Student Innovator',
+        email: user.email || ''
+      }, config);
 
-      toast.success('SIH Squad published successfully!');
-      window.location.href = '/dashboard/my-team';
+      toast.success('🎉 SIH Squad published successfully!');
+      window.location.href = '/my-team';
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create team.');
     }

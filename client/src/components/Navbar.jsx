@@ -1,69 +1,152 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
+import CreateTeamModal from './CreateTeamModal';
 
-const Navbar = () => {
-  const user = JSON.parse(localStorage.getItem('userInfo') || '{}');
-  const userInitials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'VR';
+const Navbar = ({ user: propUser, onOpenSetup }) => {
+  const navigate = useNavigate();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const localUser = (() => {
+    try {
+      const saved = localStorage.getItem('userInfo');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const token = localStorage.getItem('token');
+  const user = propUser || localUser;
+  const isAuthenticated = Boolean(user && (token || user._id));
+  const userInitials = user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'IN';
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userInfo');
+    navigate('/');
+    window.location.reload();
+  };
 
   return (
-    <header className="bg-[#050A14] border-b border-gray-800/80 px-6 py-3.5 flex items-center justify-between sticky top-0 z-50 backdrop-blur-xl">
-      {/* Left Logo */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-xl bg-[#F59E0B] text-black font-extrabold flex items-center justify-center text-lg shadow-lg shadow-amber-500/10">
-          ⚡
-        </div>
-        <div className="flex flex-col">
-          <span className="font-extrabold text-base text-white tracking-tight leading-none">
-            Homiee <span className="text-[9px] bg-[#261E0C] border border-[#785412] text-[#FBBF24] px-1 py-0.2 rounded font-mono font-bold uppercase ml-1">SIH</span>
-          </span>
-          <span className="text-[9px] text-gray-500 font-mono tracking-widest uppercase">Team Formation</span>
-        </div>
-      </div>
-
-      {/* Center Nav Links */}
-      <nav className="hidden md:flex items-center gap-8 text-xs font-semibold">
-        <NavLink 
-          to="/dashboard/browse" 
-          className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-gray-400 hover:text-white transition-colors'}
-        >
-          Explore SIH Teams
-        </NavLink>
-        <NavLink 
-          to="/dashboard/teammates" 
-          className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-gray-400 hover:text-white transition-colors'}
-        >
-          Find Teammates
-        </NavLink>
-        <NavLink 
-          to="/dashboard/create" 
-          className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-gray-400 hover:text-white transition-colors'}
-        >
-          Form Your Team
-        </NavLink>
-        <NavLink 
-          to="/dashboard/requests" 
-          className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-gray-400 hover:text-white transition-colors'}
-        >
-          Requests
-        </NavLink>
-      </nav>
-
-      {/* Right User Profile Bar */}
-      <div className="flex items-center gap-3">
-        <NavLink to="/dashboard/requests" className="p-2 bg-[#0B132B] border border-gray-800 rounded-xl text-gray-400 hover:text-white transition-all relative">
-          🔔
-          <span className="w-2 h-2 rounded-full bg-amber-500 absolute top-1 right-1" />
-        </NavLink>
-
-        <NavLink to="/dashboard/profile" className="flex items-center gap-2 bg-[#0B132B] border border-gray-800 hover:border-gray-700 px-3 py-1.5 rounded-xl transition-all">
-          <div className="w-6 h-6 rounded-md bg-[#2DD4BF] text-black font-extrabold text-[10px] flex items-center justify-center">
-            {userInitials}
+    <>
+      <header className="bg-[#050A14] border-b border-[#1E293B] px-6 py-3.5 flex items-center justify-between sticky top-0 z-40 backdrop-blur-xl">
+        {/* Left Logo */}
+        <Link to="/" className="flex items-center gap-3 cursor-pointer group">
+          <div className="w-8 h-8 rounded-xl bg-[#F59E0B] text-[#000000] font-black flex items-center justify-center text-lg shadow-lg shadow-amber-500/10 group-hover:scale-105 transition-transform">
+            ⚡
           </div>
-          <span className="text-xs font-bold text-white max-w-[120px] truncate">{user.name || 'Vikramaditya Rathore'}</span>
-          <span className="text-xs text-gray-500">▾</span>
-        </NavLink>
-      </div>
-    </header>
+          <div className="flex flex-col text-left">
+            <span className="font-extrabold text-base text-white tracking-tight leading-none">
+              Homiee <span className="text-[9px] bg-[#261E0C] border border-[#785412] text-[#FBBF24] px-1 py-0.2 rounded font-mono font-bold uppercase ml-1">SIH</span>
+            </span>
+            <span className="text-[9px] text-[#94A3B8] font-mono tracking-widest uppercase">Team Formation</span>
+          </div>
+        </Link>
+
+        {/* Center Nav Links */}
+        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold">
+          <NavLink 
+            to="/teams" 
+            className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-[#CBD5E1] hover:text-white transition-colors'}
+          >
+            Explore SIH Teams
+          </NavLink>
+          <NavLink 
+            to="/teammates" 
+            className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-[#CBD5E1] hover:text-white transition-colors'}
+          >
+            Find Teammates
+          </NavLink>
+          <NavLink 
+            to="/team" 
+            className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-[#CBD5E1] hover:text-white transition-colors'}
+          >
+            Team
+          </NavLink>
+          {isAuthenticated && (
+            <NavLink 
+              to="/requests" 
+              className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-[#CBD5E1] hover:text-white transition-colors'}
+            >
+              Requests
+            </NavLink>
+          )}
+        </nav>
+
+        {/* Right User Bar / Login-Signup Buttons */}
+        <div className="flex items-center gap-3">
+          {isAuthenticated ? (
+            <>
+              {/* Prominent Create Team Button in Top-Right */}
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs px-3.5 py-2 rounded-xl transition-all shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <span>+</span> Create Team
+              </button>
+
+              {user && !user.isProfileComplete && !user.profileComplete && onOpenSetup && (
+                <button
+                  onClick={onOpenSetup}
+                  className="hidden sm:inline-flex bg-[#17130A] border border-[#F59E0B]/70 text-[#FBBF24] text-xs font-mono font-bold px-3 py-1.5 rounded-xl hover:bg-amber-500/20 cursor-pointer"
+                >
+                  ⚡ Setup Profile
+                </button>
+              )}
+
+              <NavLink 
+                to="/requests" 
+                className="p-2 bg-[#0B132B] border border-[#1E293B] hover:border-[#334155] rounded-xl text-[#CBD5E1] hover:text-white transition-all relative"
+                title="Notifications / Requests"
+              >
+                🔔
+                <span className="w-2 h-2 rounded-full bg-amber-500 absolute top-1 right-1" />
+              </NavLink>
+
+              <NavLink 
+                to="/profile" 
+                className="flex items-center gap-2 bg-[#0B132B] border border-[#1E293B] hover:border-[#334155] px-3 py-1.5 rounded-xl transition-all"
+              >
+                <div className="w-6 h-6 rounded-md bg-[#2DD4BF] text-black font-extrabold text-[10px] flex items-center justify-center">
+                  {userInitials}
+                </div>
+                <span className="text-xs font-bold text-white max-w-[120px] truncate">{user?.name || 'Innovator'}</span>
+                <span className="text-xs text-[#94A3B8]">▾</span>
+              </NavLink>
+
+              <button
+                onClick={handleLogout}
+                title="Log out"
+                className="bg-[#0F172A] hover:bg-rose-950/40 border border-[#1E293B] hover:border-rose-700/50 text-[#CBD5E1] hover:text-rose-400 px-2.5 py-1.5 rounded-xl text-xs font-mono transition-colors cursor-pointer"
+              >
+                ⎋ Logout
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <Link
+                to="/login"
+                className="bg-[#0B132B] hover:bg-[#16223D] border border-[#334155] text-white font-bold text-xs px-4 py-2 rounded-xl transition-all"
+              >
+                Log In
+              </Link>
+              <Link
+                to="/login?mode=signup"
+                className="bg-[#F59E0B] hover:bg-[#E08D00] text-[#000000] font-black text-xs px-4 py-2 rounded-xl transition-all shadow-md shadow-amber-500/10"
+              >
+                ⚡ Sign Up
+              </Link>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Global Create Team Modal */}
+      <CreateTeamModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+      />
+    </>
   );
 };
 

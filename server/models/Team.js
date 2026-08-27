@@ -12,9 +12,10 @@ const teamSchema = new mongoose.Schema({
   problemStatementTitle: { type: String, required: true },
   organization: { type: String, default: 'Ministry / Organization' },
   
-  leader: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  coLeaders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  leader: { type: mongoose.Schema.Types.Mixed, ref: 'User', required: true, index: true },
+  leaderName: { type: String, default: '' },
+  coLeaders: [{ type: mongoose.Schema.Types.Mixed, ref: 'User' }],
+  members: [{ type: mongoose.Schema.Types.Mixed, ref: 'User' }],
   maxMembers: { type: Number, default: 6 },
   isOpen: { type: Boolean, default: true, index: true },
   
@@ -33,7 +34,7 @@ const teamSchema = new mongoose.Schema({
   
   // Join Requests
   requests: [{
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: mongoose.Schema.Types.Mixed, ref: 'User', required: true },
     userName: String,
     role: String,
     pitchNote: String,
