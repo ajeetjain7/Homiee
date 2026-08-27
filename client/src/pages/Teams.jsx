@@ -1,43 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import TeamCard from '../components/TeamCard';
 
-// Dummy initial data to simulate backend response
-const DUMMY_TEAMS = [
-  {
-    id: 1,
-    teamName: "Null Pointers",
-    hackathonName: "Smart India Hackathon 2026",
-    description: "Building an AI-assisted crop advisory app for local farmers. Looking for a strong backend dev.",
-    skills: ["React", "Node.js", "MongoDB"],
-    rolesNeeded: ["Backend Dev"],
-    membersCount: 3,
-    maxMembers: 5,
-    status: "open"
-  },
-  {
-    id: 2,
-    teamName: "Indore Innovators",
-    hackathonName: "HackIndore 2026",
-    description: "Designing a smart campus transit tracker for local college students in Indore.",
-    skills: ["Python", "FastAPI", "Flutter"],
-    rolesNeeded: ["UI/UX Designer", "Mobile Dev"],
-    membersCount: 2,
-    maxMembers: 4,
-    status: "open"
-  }
-];
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const Teams = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [teams] = useState(DUMMY_TEAMS);
+  const [teams, setTeams] = useState([]);
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/api/teams`)
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setTeams(res.data);
+        }
+      })
+      .catch(err => console.error('Error fetching teams:', err));
+  }, []);
 
   const filteredTeams = teams.filter(t => 
-    t.teamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.skills.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
+    (t.name && t.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (t.teamName && t.teamName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (t.criticalSkills && t.criticalSkills.some(s => (s.skillName || s).toLowerCase().includes(searchTerm.toLowerCase()))) ||
+    (t.skills && t.skills.some(s => (s.skillName || s).toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   const handleRequestJoin = (team) => {
-    alert(`Request sent to join ${team.teamName}!`);
+    alert(`Request sent to join ${team.name || team.teamName}!`);
   };
 
   return (

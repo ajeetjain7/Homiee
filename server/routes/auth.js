@@ -38,35 +38,7 @@ router.get('/google', async (req, res) => {
   const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
 
   if (!clientId) {
-    // If GOOGLE_CLIENT_ID is not configured in .env, create or fetch a standard Google User session
-    // and perform full-page browser redirect to /auth/callback (prevents popup COOP errors)
-    const demoGoogleEmail = `innovator.google_${Date.now()}@gmail.com`;
-    let user = await User.create({
-      name: 'Google Innovator',
-      email: demoGoogleEmail,
-      photoUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-      college: '',
-      classBranch: '',
-      section: '',
-      year: '3rd Year',
-      gender: 'Prefer not to say',
-      primaryRole: 'Fullstack Developer',
-      capabilities: ['PPT Making & Pitch Deck', 'Frontend UI / UX'],
-      technicalSkills: ['React', 'PPT Making', 'Node.js'],
-      sihThemes: ['Agriculture & Rural Development'],
-      about: '',
-      profileComplete: false,
-      isProfileComplete: false,
-      sihReadinessScore: 25
-    });
-
-    const token = generateToken(user);
-    const userSafe = user.toObject ? user.toObject() : user;
-    delete userSafe.password;
-
-    const redirectTarget = `${CLIENT_URL}/auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(userSafe))}&isNew=true`;
-    return res.redirect(redirectTarget);
+    return res.redirect(`${CLIENT_URL}/login?error=${encodeURIComponent('Google OAuth Client ID is not configured.')}`);
   }
 
   const scope = encodeURIComponent('openid profile email');

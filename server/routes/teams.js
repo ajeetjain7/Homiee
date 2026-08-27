@@ -303,7 +303,7 @@ router.post('/create', async (req, res, next) => {
       return res.status(400).json({ message: 'Team name, PS code, PS title, and description are required.' });
     }
 
-    // Resolve or create user document in MongoDB so leader reference is always valid
+    // Resolve user document in MongoDB so leader reference is always valid
     let leaderDoc = null;
     if (mongoose.Types.ObjectId.isValid(callerId)) {
       leaderDoc = await User.findById(callerId);
@@ -317,20 +317,11 @@ router.post('/create', async (req, res, next) => {
       leaderDoc = await User.findOne({ name: userName.trim() });
     }
 
-    // If still not in DB, create user entry automatically
     if (!leaderDoc) {
-      const generatedEmail = email ? email.toLowerCase().trim() : `${(userName || 'innovator').toLowerCase().replace(/\s+/g, '')}_${Date.now()}@sih.edu`;
-      leaderDoc = await User.create({
-        name: userName || 'Student Innovator',
-        email: generatedEmail,
-        primaryRole: 'Fullstack Developer',
-        profileComplete: true,
-        isProfileComplete: true,
-        sihReadinessScore: 30
-      });
+      return res.status(401).json({ message: 'Valid registered user required to create a team. Please log in first.' });
     }
 
-    const finalLeaderId = leaderDoc ? leaderDoc._id : callerId;
+    const finalLeaderId = leaderDoc._id;
 
     // Check maximum 3 active teams per person in total
     const activeTeamCount = await getUserActiveTeamCount(finalLeaderId, email || leaderDoc?.email, userName || leaderDoc?.name);

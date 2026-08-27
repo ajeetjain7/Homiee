@@ -97,6 +97,24 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ message: 'A pending request / invitation already exists for this candidate.' });
     }
 
+    // Check if target candidate is already in 3 squads
+    let recipientIds = [toUserId, toUserId.toString()];
+    if (mongoose.Types.ObjectId.isValid(toUserId)) {
+      recipientIds.push(new mongoose.Types.ObjectId(toUserId));
+    }
+    if (resolvedToEmail) {
+      recipientIds.push(resolvedToEmail.toLowerCase().trim());
+    }
+    const candidateActiveCount = await Team.countDocuments({
+      $or: [
+        { leader: { $in: recipientIds } },
+        { members: { $in: recipientIds } }
+      ]
+    });
+    if (candidateActiveCount >= 3) {
+      return res.status(400).json({ message: 'Limit reached: Candidate is already a member of 3 squads.' });
+    }
+
     const newRequest = await Request.create({
       fromUserId: callerId,
       fromUserName: resolvedSenderName || 'Squad Leader',

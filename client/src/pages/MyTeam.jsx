@@ -455,13 +455,31 @@ const MyTeam = ({ currentUser }) => {
     <div className="max-w-6xl mx-auto space-y-8 font-sans text-[#F8FAFC] select-none pb-12">
       
       {/* Squads Switcher Bar if User Leads/Belongs to Multiple Teams */}
-      {teams.length > 1 && (
+      {teams.length > 0 && (
         <div className="bg-[#0B132B] border border-[#1E293B] p-4 rounded-2xl space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-[#F59E0B] font-bold tracking-widest uppercase">
-              ⚡ YOUR ACTIVE SQUADS ({teams.length})
-            </span>
-            <span className="text-xs text-[#CBD5E1]">Select a squad to view its roster & chat:</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-[#F59E0B] font-bold tracking-widest uppercase">
+                ⚡ YOUR ACTIVE SQUADS ({teams.length}/3)
+              </span>
+              {teams.length >= 3 ? (
+                <span className="text-[10px] font-mono bg-red-950/60 border border-red-800/80 text-red-300 px-2 py-0.5 rounded-full font-bold">
+                  🔒 Limit Reached (3/3)
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                  {3 - teams.length} squad spot{3 - teams.length > 1 ? 's' : ''} available
+                </span>
+              )}
+            </div>
+            {teams.length < 3 && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                + Create Squad ({teams.length}/3)
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -476,7 +494,7 @@ const MyTeam = ({ currentUser }) => {
                   onClick={() => setSelectedTeamId(t._id)}
                   className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-[#17130A] border-[#F59E0B] shadow-lg shadow-amber-500/10'
+                      ? 'bg-[#17130A] border-[#F59E0B] shadow-lg shadow-amber-500/10 ring-1 ring-[#F59E0B]/30'
                       : 'bg-[#070D18] border-[#1E293B] hover:border-[#334155]'
                   }`}
                 >

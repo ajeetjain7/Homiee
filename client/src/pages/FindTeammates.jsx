@@ -5,129 +5,6 @@ import toast from 'react-hot-toast';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const DEFAULT_CANDIDATES = [
-  {
-    _id: 'seed_1',
-    name: 'Vikramaditya Rathore',
-    gender: 'Male',
-    college: 'IET DAVV, Indore',
-    classBranch: 'B.Tech Computer Science & Eng.',
-    section: 'Section B',
-    year: '3rd Year',
-    yearAndBranch: '3rd Year • B.Tech CSE (Section B)',
-    primaryRole: 'Fullstack Developer',
-    capabilities: ['PPT Making & Pitch Deck', 'Frontend UI / UX', 'Backend & APIs'],
-    technicalSkills: ['React', 'Node.js', 'MongoDB', 'PPT Making', 'Canva', 'TailwindCSS'],
-    sihThemes: ['Agriculture & Rural Development', 'Smart Education & Learning'],
-    about: 'Passionate fullstack engineer & pitch presentation designer. 3 hackathons won, looking for enthusiastic teammates for SIH 2026.',
-    github: 'https://github.com/vikram-rathore',
-    linkedin: 'https://linkedin.com/in/vikram-rathore',
-    portfolio: 'https://vikramaditya.dev',
-    leetcodeRating: '1920 (Knight)',
-    sihReadinessScore: 92
-  },
-  {
-    _id: 'seed_2',
-    name: 'Divya Nambiar',
-    gender: 'Female',
-    college: 'NIT, Trichy',
-    classBranch: 'B.Tech AI & Data Science',
-    section: 'Section A',
-    year: '3rd Year',
-    yearAndBranch: '3rd Year • AI & Data Sci. (Section A)',
-    primaryRole: 'AI / ML Engineer',
-    capabilities: ['AI / ML & Deep Learning', 'Research & Documentation', 'PPT Making & Pitch Deck'],
-    technicalSkills: ['Python', 'PyTorch', 'Computer Vision', 'YOLOv8', 'FastAPI', 'Canva'],
-    sihThemes: ['Healthcare & Biomedical Devices', 'Clean & Renewable Green Technology'],
-    about: 'Specialized in Computer Vision & real-time edge AI inference. SIH finalist in 2024. Expert in converting technical architectures into clean PPT pitch decks.',
-    github: 'https://github.com/divya-ml',
-    linkedin: 'https://linkedin.com/in/divya-nambiar',
-    portfolio: 'https://divyanambiar.ai',
-    leetcodeRating: '1750',
-    sihReadinessScore: 88
-  },
-  {
-    _id: 'seed_3',
-    name: 'Sneha Reddy',
-    gender: 'Female',
-    college: 'SRM Inst. of Science & Tech',
-    classBranch: 'B.Tech Cybersecurity',
-    section: 'Section C',
-    year: '2nd Year',
-    yearAndBranch: '2nd Year • Cybersecurity (Section C)',
-    primaryRole: 'Cybersecurity Specialist',
-    capabilities: ['Cybersecurity & Auditing', 'Backend & APIs', 'Research & Documentation'],
-    technicalSkills: ['Linux', 'Cryptography', 'Smart Contracts', 'Solidity', 'Go', 'Docker'],
-    sihThemes: ['Cybersecurity & Disaster Management', 'Fintech & Web3 Blockchain'],
-    about: 'CTF player and smart contract security researcher. Ready to build bulletproof backend systems for SIH 2026 themes.',
-    github: 'https://github.com/sneha-sec',
-    linkedin: 'https://linkedin.com/in/sneha-reddy',
-    portfolio: '',
-    leetcodeRating: '1680',
-    sihReadinessScore: 84
-  },
-  {
-    _id: 'seed_4',
-    name: 'Rohan Gupta',
-    gender: 'Male',
-    college: 'BITS Pilani',
-    classBranch: 'B.E. Computer Science',
-    section: 'Section A',
-    year: '2nd Year',
-    yearAndBranch: '2nd Year • CSE (Section A)',
-    primaryRole: 'PPT & Presentation Specialist',
-    capabilities: ['PPT Making & Pitch Deck', 'Frontend UI / UX', 'Research & Documentation'],
-    technicalSkills: ['PPT Making', 'Canva', 'Figma', 'Pitch Deck Design', 'HTML5/CSS3', 'React'],
-    sihThemes: ['Smart Education & Learning', 'Heritage, Culture & Tourism'],
-    about: 'Master at designing winning SIH PPT presentations, product pitch videos, and UI prototypes. Ensures our team presentation scores 10/10 with judges.',
-    github: 'https://github.com/rohan-design',
-    linkedin: 'https://linkedin.com/in/rohan-gupta',
-    portfolio: 'https://rohandesign.com',
-    leetcodeRating: 'N/A',
-    sihReadinessScore: 86
-  },
-  {
-    _id: 'seed_5',
-    name: 'Aditya Verma',
-    gender: 'Male',
-    college: 'Manipal Inst. of Technology',
-    classBranch: 'B.Tech IT',
-    section: 'Section B',
-    year: '4th Year',
-    yearAndBranch: '4th Year • IT (Section B)',
-    primaryRole: 'Backend Developer',
-    capabilities: ['Backend & APIs', 'System Architecture', 'Database Management'],
-    technicalSkills: ['Node.js', 'Express', 'PostgreSQL', 'Redis', 'Docker', 'AWS'],
-    sihThemes: ['Transportation & Logistics', 'Fintech & Web3 Blockchain'],
-    about: 'High-scale backend architect. Built microservices serving 50k+ requests. Looking for AI and frontend innovators to tackle SIH logistics statements.',
-    github: 'https://github.com/aditya-verma',
-    linkedin: 'https://linkedin.com/in/aditya-verma',
-    portfolio: 'https://adityaverma.dev',
-    leetcodeRating: '2040 (Guardian)',
-    sihReadinessScore: 94
-  },
-  {
-    _id: 'seed_6',
-    name: 'Vikram Aditya',
-    gender: 'Male',
-    college: 'IIIT Hyderabad',
-    classBranch: 'B.Tech ECE',
-    section: 'Section A',
-    year: '3rd Year',
-    yearAndBranch: '3rd Year • ECE (Section A)',
-    primaryRole: 'IoT & Embedded Engineer',
-    capabilities: ['Hardware & IoT', 'Backend & APIs', 'PPT Making & Pitch Deck'],
-    technicalSkills: ['Arduino', 'ESP32', 'MQTT Protocol', 'C++', 'Circuit Design', 'Canva'],
-    sihThemes: ['Agriculture & Rural Development', 'Smart Automation & Robotics'],
-    about: 'Hardware tinkerer with 6 IoT sensors & robotics projects. Experienced in hardware edition SIH problem statements.',
-    github: 'https://github.com/vikram-iot',
-    linkedin: 'https://linkedin.com/in/vikram-aditya',
-    portfolio: '',
-    leetcodeRating: '1620',
-    sihReadinessScore: 82
-  }
-];
-
 const TECH_STACK_OPTIONS = [
   'Frontend', 'Backend', 'AI/ML', 'IoT', 'UI/UX', 'Cloud/DevOps', 
   'PPT Making', 'React', 'Node.js', 'Python', 'Docker', 'PyTorch', 'MongoDB', 'Flutter'
@@ -179,53 +56,11 @@ const FindTeammates = ({ currentUser }) => {
       });
 
       const res = await axios.get(`${API_BASE}/api/auth/teammates?${queryParams.toString()}`);
-      let fetchedList = res.data;
-
-      if (!fetchedList || fetchedList.length === 0) {
-        fetchedList = DEFAULT_CANDIDATES;
-      }
-
-      // Merge current user if complete
-      if (localUser && (localUser.isProfileComplete || localUser.profileComplete)) {
-        const alreadyInList = fetchedList.some(u => u._id === localUser._id || u.email === localUser.email);
-        if (!alreadyInList) {
-          fetchedList = [localUser, ...fetchedList];
-        }
-      }
-
-      // Client-side fallback filter if offline/demo
-      const filtered = fetchedList.filter((c) => {
-        const matchSearch = !skillSearch.trim() || 
-          c.name.toLowerCase().includes(skillSearch.toLowerCase()) ||
-          (c.classBranch && c.classBranch.toLowerCase().includes(skillSearch.toLowerCase())) ||
-          (c.college && c.college.toLowerCase().includes(skillSearch.toLowerCase())) ||
-          (c.about && c.about.toLowerCase().includes(skillSearch.toLowerCase())) ||
-          (c.technicalSkills && c.technicalSkills.some(s => s.toLowerCase().includes(skillSearch.toLowerCase()))) ||
-          (c.capabilities && c.capabilities.some(cap => cap.toLowerCase().includes(skillSearch.toLowerCase())));
-
-        const matchGender = selectedGender === 'All Genders' || selectedGender === 'All' || c.gender === selectedGender;
-        const matchRole = selectedRole === 'All Technical Roles' || selectedRole === 'All Roles' || c.primaryRole === selectedRole;
-        const matchCap = selectedCapability === 'All Capabilities' || (c.capabilities && c.capabilities.includes(selectedCapability));
-        const matchTheme = selectedTheme === 'All Interested SIH Themes' || selectedTheme === 'All Themes' || (c.sihThemes && c.sihThemes.includes(selectedTheme));
-        const matchYear = selectedYear === 'All Academic Years' || selectedYear === 'All' || c.year === selectedYear;
-        const matchPs = !selectedPsCode || selectedPsCode === 'All PS Codes' || (c.about && c.about.toLowerCase().includes(selectedPsCode.toLowerCase()));
-        
-        const matchSkills = selectedSkills.length === 0 || selectedSkills.every(sk => 
-          (c.technicalSkills && c.technicalSkills.some(ts => ts.toLowerCase().includes(sk.toLowerCase()))) ||
-          (c.capabilities && c.capabilities.some(cap => cap.toLowerCase().includes(sk.toLowerCase())))
-        );
-
-        return matchSearch && matchGender && matchRole && matchCap && matchTheme && matchYear && matchPs && matchSkills;
-      });
-
-      setCandidates(filtered);
+      const fetchedList = Array.isArray(res.data) ? res.data : [];
+      setCandidates(fetchedList);
     } catch (err) {
-      console.warn('Backend unavailable, using local teammate pool:', err);
-      let list = DEFAULT_CANDIDATES;
-      if (localUser && (localUser.isProfileComplete || localUser.profileComplete)) {
-        list = [localUser, ...DEFAULT_CANDIDATES.filter(c => c.email !== localUser.email)];
-      }
-      setCandidates(list);
+      console.warn('Could not fetch teammates:', err.message);
+      setCandidates([]);
     } finally {
       setLoading(false);
     }
