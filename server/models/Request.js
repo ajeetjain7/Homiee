@@ -16,5 +16,11 @@ const requestSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending', index: true }
 }, { timestamps: true });
 
+// Compound Indexes for fast lookups under high concurrency
+requestSchema.index({ toUserId: 1, status: 1 });
+requestSchema.index({ toUserEmail: 1, status: 1 });
+requestSchema.index({ fromUserId: 1, toUserId: 1, teamId: 1, status: 1 });
+requestSchema.index({ teamId: 1, status: 1 });
+
 module.exports = mongoose.model('Request', requestSchema);
 

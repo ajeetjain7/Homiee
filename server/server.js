@@ -61,17 +61,35 @@ const teamMessages = {};
 
 // Socket.io Real-time Team Chat
 io.on('connection', (socket) => {
-  // Join squad chat room (Enforces 3-day message retention policy)
+  // Join squad chat room (Enforces squad authorization & 3-day message retention policy)
   socket.on('join_team', async ({ teamId, user }) => {
     if (!teamId) return;
     const tid = teamId.toString();
-    socket.join(`team_${tid}`);
-    socket.join(tid);
-    
+
     try {
       const Message = require('./models/Message');
       const Team = require('./models/Team');
       const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+      // Authorization Check: If user provided, verify user is leader or member of this team
+      if (user && (user._id || user.email)) {
+        const teamDoc = await Team.findById(tid).select('leader members').lean();
+        if (teamDoc) {
+          const userStr = (user._id || '').toString();
+          const userEmail = (user.email || '').toLowerCase().trim();
+          const isLead = (teamDoc.leader?._id || teamDoc.leader || '').toString() === userStr ||
+                         (teamDoc.leader?.email && teamDoc.leader.email.toLowerCase() === userEmail);
+          const isMem = Array.isArray(teamDoc.members) && teamDoc.members.some(m => 
+            (m?._id || m || '').toString() === userStr || (m?.email && m.email.toLowerCase() === userEmail)
+          );
+          if (!isLead && !isMem) {
+            return socket.emit('join_error', { message: 'Unauthorized: You are not a member of this squad.' });
+          }
+        }
+      }
+
+      socket.join(`team_${tid}`);
+      socket.join(tid);
 
       // Clean up any old array messages older than 3 days in Team document
       Team.findByIdAndUpdate(tid, {
@@ -132,6 +150,23 @@ io.on('connection', (socket) => {
     try {
       const Message = require('./models/Message');
       const Team = require('./models/Team');
+
+      // Authorization Check on Send
+      if (user && (user._id || user.email)) {
+        const teamDoc = await Team.findById(tid).select('leader members').lean();
+        if (teamDoc) {
+          const userStr = (user._id || '').toString();
+          const userEmail = (user.email || '').toLowerCase().trim();
+          const isLead = (teamDoc.leader?._id || teamDoc.leader || '').toString() === userStr ||
+                         (teamDoc.leader?.email && teamDoc.leader.email.toLowerCase() === userEmail);
+          const isMem = Array.isArray(teamDoc.members) && teamDoc.members.some(m => 
+            (m?._id || m || '').toString() === userStr || (m?.email && m.email.toLowerCase() === userEmail)
+          );
+          if (!isLead && !isMem) {
+            return socket.emit('send_error', { message: 'Forbidden: You cannot send messages to a squad you are not part of.' });
+          }
+        }
+      }
 
       const savedMsgDoc = await Message.create({
         teamId: tid,

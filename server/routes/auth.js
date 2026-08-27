@@ -401,6 +401,22 @@ router.put('/profile', async (req, res) => {
       return res.status(400).json({ message: 'User ID is required to update profile' });
     }
 
+    // IDOR Protection: Verify caller authorization token matches target userId
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const callerId = decoded.userId || decoded.id;
+        if (callerId && callerId.toString() !== userId.toString()) {
+          return res.status(403).json({ message: 'Forbidden: You cannot modify another user\'s profile.' });
+        }
+      } catch (err) {
+        // Token invalid
+        return res.status(401).json({ message: 'Invalid or expired authorization token.' });
+      }
+    }
+
     // Format yearAndBranch string if year and classBranch are given
     if (updateData.year && updateData.classBranch) {
       updateData.yearAndBranch = `${updateData.year} • ${updateData.classBranch}${updateData.section ? ` (${updateData.section})` : ''}`;
