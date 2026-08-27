@@ -100,6 +100,8 @@ const OnboardingModal = ({ user, onComplete }) => {
     const payload = {
       userId: user?._id || 'user_' + Date.now(),
       ...formData,
+      photoUrl: user?.photoUrl || user?.avatar || formData.photoUrl || '',
+      avatar: user?.avatar || user?.photoUrl || formData.avatar || '',
       profileComplete: true,
       isProfileComplete: true,
       yearAndBranch: `${formData.year} • ${formData.classBranch}${formData.section ? ` (${formData.section})` : ''}`

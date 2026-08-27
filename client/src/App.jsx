@@ -32,18 +32,22 @@ function AppLayout({ children }) {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    // Check if onboarding needs to be opened (either first time or state passed)
+    // Check if onboarding needs to be opened (only if profile is genuinely incomplete)
     const isComplete = Boolean(currentUser?.profileComplete || currentUser?.isProfileComplete);
     if (currentUser && !isComplete) {
       setShowOnboarding(true);
-    } else if (location.state?.openSetup) {
-      setShowOnboarding(true);
+    } else {
+      setShowOnboarding(false);
     }
-  }, [currentUser, location.state]);
+  }, [currentUser]);
 
   const handleProfileComplete = (updatedUser) => {
     setCurrentUser(updatedUser);
     setShowOnboarding(false);
+    // Clear location state so openSetup never re-triggers onboarding modal
+    if (window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   };
 
   const isProfileComplete = Boolean(currentUser?.profileComplete || currentUser?.isProfileComplete);

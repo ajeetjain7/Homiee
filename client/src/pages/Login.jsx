@@ -21,10 +21,44 @@ const Login = () => {
     }
   }, [searchParams]);
 
-  // Google OAuth Handler (Full-Page Browser Redirect — No Popup COOP Issues)
-  const handleGoogleLogin = () => {
+  // Google OAuth Handler (Direct Firebase Google Sign-In with MongoDB Profile Sync)
+  const handleGoogleLogin = async () => {
     setLoading(true);
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    try {
+      const { user: gUser, token: fbToken } = await loginWithGoogle();
+      
+      const payload = {
+        token: fbToken,
+        googleId: gUser.uid || gUser.providerData?.[0]?.uid || '',
+        email: gUser.email,
+        name: gUser.displayName || 'Student Innovator',
+        photoUrl: gUser.photoURL || '',
+        avatar: gUser.photoURL || ''
+      };
+
+      const res = await axios.post('http://localhost:5000/api/auth/google', payload);
+
+      localStorage.setItem('token', res.data.token || fbToken);
+      localStorage.setItem('userInfo', JSON.stringify(res.data));
+
+      toast.success(`Welcome, ${res.data.name || 'Innovator'}!`);
+
+      const isComplete = Boolean(res.data.profileComplete || res.data.isProfileComplete);
+      if (!isComplete) {
+        navigate('/teammates', { state: { openSetup: true } });
+      } else {
+        navigate('/teammates');
+      }
+    } catch (err) {
+      console.error('Google Sign-In Error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        toast('Google sign-in popup was closed.');
+      } else {
+        toast.error(err.response?.data?.message || err.message || 'Google Sign-In failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Email & Password Submit Handler

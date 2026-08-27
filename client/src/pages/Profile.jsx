@@ -154,9 +154,18 @@ const Profile = ({ onUpdateUser }) => {
         <div className="flex flex-col md:flex-row items-start justify-between gap-6">
           
           <div className="flex items-start gap-5">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black text-2xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-              {userInitials}
-            </div>
+            {user.photoUrl || user.avatar ? (
+              <img
+                src={user.photoUrl || user.avatar}
+                alt={user.name}
+                className="w-20 h-20 rounded-2xl object-cover border-2 border-amber-500/50 shadow-lg shadow-amber-500/20"
+                onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black text-2xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+                {userInitials}
+              </div>
+            )}
 
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-3">
@@ -178,7 +187,9 @@ const Profile = ({ onUpdateUser }) => {
               <p className="text-xs text-gray-300 font-medium">
                 🎓 {user.college || 'College / Institute'} • <span className="text-[#38BDF8]">{user.year || '3rd Year'}</span> • {user.classBranch || 'Computer Science'} {user.section ? `(${user.section})` : ''}
               </p>
-              <p className="text-xs font-mono text-gray-400">{user.email}</p>
+              <p className="text-xs font-mono text-amber-400 font-bold flex items-center gap-1.5 mt-1">
+                <span>✉️</span> {user.email}
+              </p>
             </div>
           </div>
 

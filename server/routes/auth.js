@@ -159,29 +159,40 @@ router.get('/google/callback', async (req, res) => {
 // 3. POST /api/auth/google — Frontend Firebase/Google Token Authentication
 router.post('/google', async (req, res) => {
   try {
-    const { token: googleToken, email, name, avatar, photoUrl, picture } = req.body;
+    const { token: googleToken, email, name, avatar, photoUrl, picture, googleId, uid, sub } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required from authentication payload.' });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const userPhoto = photoUrl || picture || avatar || '';
-    let user = await User.findOne({ email: normalizedEmail });
+    const gId = (googleId || uid || sub || '').trim();
+    const userPhoto = (photoUrl || picture || avatar || '').trim();
+
+    // 1. Check if user exists by stable Google ID or normalized Email
+    let user = null;
+    if (gId) {
+      user = await User.findOne({ $or: [{ googleId: gId }, { email: normalizedEmail }] });
+    } else {
+      user = await User.findOne({ email: normalizedEmail });
+    }
+
     let isNewUser = false;
 
     if (!user) {
+      // 2. Create new user if not found in MongoDB
       isNewUser = true;
       user = await User.create({
         name: name || 'Student Innovator',
         email: normalizedEmail,
+        googleId: gId,
         photoUrl: userPhoto,
         avatar: userPhoto,
         college: '',
         classBranch: '',
         section: '',
         year: '3rd Year',
-        yearAndBranch: '',
+        yearAndBranch: '3rd Year • Computer Science',
         gender: 'Prefer not to say',
         primaryRole: 'Fullstack Developer',
         capabilities: ['PPT Making & Pitch Deck', 'Frontend UI / UX'],
@@ -192,12 +203,24 @@ router.post('/google', async (req, res) => {
         isProfileComplete: false,
         sihReadinessScore: 25
       });
-    } else if (userPhoto && (!user.photoUrl || !user.avatar)) {
-      user.photoUrl = userPhoto;
-      user.avatar = userPhoto;
-      await user.save();
+    } else {
+      // 3. Update existing user's googleId or photoUrl if missing
+      let needsSave = false;
+      if (gId && !user.googleId) {
+        user.googleId = gId;
+        needsSave = true;
+      }
+      if (userPhoto && (!user.photoUrl || !user.avatar)) {
+        user.photoUrl = userPhoto;
+        user.avatar = userPhoto;
+        needsSave = true;
+      }
+      if (needsSave) {
+        await user.save();
+      }
     }
 
+    const isProfileComplete = Boolean(user.profileComplete || user.isProfileComplete);
     const token = generateToken(user);
     const userObj = user.toObject();
     delete userObj.password;
@@ -205,7 +228,9 @@ router.post('/google', async (req, res) => {
     res.status(200).json({
       ...userObj,
       token,
-      isNewUser: isNewUser || (!user.profileComplete && !user.isProfileComplete)
+      profileComplete: isProfileComplete,
+      isProfileComplete: isProfileComplete,
+      isNewUser: isNewUser || !isProfileComplete
     });
   } catch (error) {
     console.error('Backend Google Auth Error:', error);
@@ -376,7 +401,7 @@ router.get('/teammates', async (req, res) => {
     const query = conditions.length > 0 ? { $and: conditions } : {};
 
     const teammates = await User.find(query)
-      .select('-password -email')
+      .select('-password')
       .sort({ sihReadinessScore: -1, updatedAt: -1 })
       .lean();
 

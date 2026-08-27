@@ -545,6 +545,11 @@ const FindTeammates = ({ currentUser }) => {
                   <p className="text-[11px] font-mono text-[#CBD5E1]">
                     {c.year || '3rd Year'} • {c.classBranch || 'Computer Science'} {c.section ? `(${c.section})` : ''}
                   </p>
+                  {c.email && (
+                    <p className="text-[11px] font-mono text-[#F59E0B] font-bold truncate flex items-center gap-1">
+                      <span>✉️</span> {c.email}
+                    </p>
+                  )}
                 </div>
               </div>
 
