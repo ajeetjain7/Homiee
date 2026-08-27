@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('browse');
   const [isEditing, setIsEditing] = useState(false);
@@ -63,7 +65,7 @@ const Dashboard = () => {
   // Fetch Teams Live from Express/MongoDB Backend
   const fetchTeams = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/teams?search=${encodeURIComponent(searchQuery)}`);
+      const res = await axios.get(`${API_BASE}/api/teams?search=${encodeURIComponent(searchQuery)}`);
       setTeams(res.data);
     } catch (err) {
       console.error('Error fetching teams:', err);
@@ -101,9 +103,10 @@ const Dashboard = () => {
     if (!selectedTeamForRequest) return;
 
     try {
-      await axios.post(`http://localhost:5000/api/teams/${selectedTeamForRequest._id || selectedTeamForRequest.id}/request`, {
+      await axios.post(`${API_BASE}/api/teams/${selectedTeamForRequest._id || selectedTeamForRequest.id}/request`, {
         userId: user._id,
         userName: user.name,
+        email: user.email || '',
         role: requestForm.role,
         proofOfWork: requestForm.proofOfWork
       });
@@ -119,7 +122,7 @@ const Dashboard = () => {
 
   const handleSaveProfile = async () => {
     try {
-      const response = await axios.put('http://localhost:5000/api/auth/profile', {
+      const response = await axios.put(`${API_BASE}/api/auth/profile`, {
         userId: user._id,
         name: editForm.name,
         college: editForm.college,
@@ -139,16 +142,12 @@ const Dashboard = () => {
       });
 
       setUser(response.data);
-      setEditForm(response.data);
       localStorage.setItem('userInfo', JSON.stringify(response.data));
       setIsEditing(false);
-      toast.success('Profile saved to MongoDB successfully!');
-    } catch (error) {
-      console.error('Save profile error:', error);
-      setUser(editForm);
-      localStorage.setItem('userInfo', JSON.stringify(editForm));
-      setIsEditing(false);
-      toast.error('Profile updated locally.');
+      toast.success('Profile updated successfully!');
+    } catch (err) {
+      console.error('Save Profile Error:', err);
+      toast.error('Failed to update profile.');
     }
   };
 
@@ -174,27 +173,22 @@ const Dashboard = () => {
     }
   };
 
-  const handleCreateTeam = async (e) => {
+  const handleCreateTeamSubmit = async (e) => {
     e.preventDefault();
-
-    if (myTeamsCount >= 3) {
-      toast.error('Limit reached! Maximum 3 teams allowed per account.');
-      return;
-    }
-
-    if (!newTeam.name || !newTeam.hackathon) {
-      toast.error('Please fill in team name and hackathon.');
+    if (!newTeam.name.trim()) {
+      toast.error('Team name is required.');
       return;
     }
 
     try {
-      const res = await axios.post('http://localhost:5000/api/teams/create', {
+      const res = await axios.post(`${API_BASE}/api/teams/create`, {
         name: newTeam.name,
         hackathon: newTeam.hackathon,
         description: newTeam.description,
         rolesNeeded: newTeam.selectedRoles.map(r => `NEEDS: ${r}`),
         userId: user._id,
-        userName: user.name
+        userName: user.name,
+        email: user.email || ''
       });
 
       setTeams(prevTeams => [res.data, ...prevTeams]);
@@ -209,7 +203,7 @@ const Dashboard = () => {
   const handleDeleteTeam = async (teamId) => {
     if (!window.confirm('Delete this team?')) return;
     try {
-      await axios.delete(`http://localhost:5000/api/teams/${teamId}`, {
+      await axios.delete(`${API_BASE}/api/teams/${teamId}`, {
         data: { userId: user._id }
       });
       toast.success('Team deleted.');
@@ -222,7 +216,7 @@ const Dashboard = () => {
   const handleKickMember = async (teamId, targetMemberId) => {
     if (!window.confirm('Remove this member from the team?')) return;
     try {
-      await axios.post(`http://localhost:5000/api/teams/${teamId}/kick`, {
+      await axios.post(`${API_BASE}/api/teams/${teamId}/kick`, {
         userId: user._id,
         targetMemberId
       });
@@ -235,7 +229,7 @@ const Dashboard = () => {
 
   const handleMakeCoLeader = async (teamId, targetMemberId) => {
     try {
-      await axios.post(`http://localhost:5000/api/teams/${teamId}/co-leader`, {
+      await axios.post(`${API_BASE}/api/teams/${teamId}/co-leader`, {
         userId: user._id,
         targetMemberId
       });
@@ -248,7 +242,7 @@ const Dashboard = () => {
 
   const handleRequestAction = async (teamId, requestId, action) => {
     try {
-      await axios.post(`http://localhost:5000/api/teams/${teamId}/request/${requestId}/action`, { action });
+      await axios.post(`${API_BASE}/api/teams/${teamId}/request/${requestId}/action`, { action, userId: user._id });
       toast.success(`Request ${action}ed!`);
       fetchTeams();
     } catch (err) {

@@ -4,6 +4,8 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { loginWithGoogle } from '../services/firebase';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const Login = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -36,7 +38,7 @@ const Login = () => {
         avatar: gUser.photoURL || ''
       };
 
-      const res = await axios.post('http://localhost:5000/api/auth/google', payload);
+      const res = await axios.post(`${API_BASE}/api/auth/google`, payload);
 
       localStorage.setItem('token', res.data.token || fbToken);
       localStorage.setItem('userInfo', JSON.stringify(res.data));
@@ -72,8 +74,8 @@ const Login = () => {
     setLoading(true);
     try {
       const endpoint = isSignUp 
-        ? 'http://localhost:5000/api/auth/register' 
-        : 'http://localhost:5000/api/auth/login';
+        ? `${API_BASE}/api/auth/register` 
+        : `${API_BASE}/api/auth/login`;
 
       const payload = isSignUp ? { name, email, password } : { email, password };
       const res = await axios.post(endpoint, payload);

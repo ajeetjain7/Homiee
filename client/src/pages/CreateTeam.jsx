@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const CreateTeam = () => {
   const user = JSON.parse(localStorage.getItem('userInfo') || '{}');
 
@@ -64,7 +66,7 @@ const CreateTeam = () => {
       const token = localStorage.getItem('token');
       const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
-      await axios.post('http://localhost:5000/api/teams/create', {
+      await axios.post(`${API_BASE}/api/teams/create`, {
         ...form,
         vacancies,
         criticalSkills,

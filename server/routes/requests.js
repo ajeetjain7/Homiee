@@ -310,6 +310,11 @@ router.patch('/:id', async (req, res, next) => {
       // Find the team
       const team = await Team.findById(requestDoc.teamId);
       if (team) {
+        if (!team.members) team.members = [];
+        if (team.members.length >= (team.maxMembers || 6)) {
+          return res.status(400).json({ message: 'Team roster is already full (maximum 6 members).' });
+        }
+
         // Determine which user is joining the team:
         // If it was an 'invite', toUserId is joining
         // If it was a 'join_request', fromUserId is joining
@@ -321,14 +326,34 @@ router.patch('/:id', async (req, res, next) => {
           const userDoc = await User.findOne({ 
             $or: [
               { name: requestDoc.toUserName },
-              { email: joiningUserId }
+              { email: joiningUserId },
+              { email: requestDoc.toUserEmail }
             ] 
           });
           if (userDoc) memberIdToAdd = userDoc._id;
         }
 
+        // Enforce maximum 3 teams per person in total
+        let checkIds = [memberIdToAdd, memberIdToAdd.toString()];
+        if (mongoose.Types.ObjectId.isValid(memberIdToAdd)) {
+          checkIds.push(new mongoose.Types.ObjectId(memberIdToAdd));
+        }
+        if (requestDoc.toUserEmail) {
+          checkIds.push(requestDoc.toUserEmail.toLowerCase().trim());
+        }
+
+        const activeTeamCount = await Team.countDocuments({
+          $or: [
+            { leader: { $in: checkIds } },
+            { members: { $in: checkIds } }
+          ]
+        });
+
+        if (activeTeamCount >= 3) {
+          return res.status(400).json({ message: 'Limit reached: User is already a member of 3 teams.' });
+        }
+
         // Add user to team members array if not already present
-        if (!team.members) team.members = [];
         const alreadyMember = team.members.some(m => (m?._id || m).toString() === memberIdToAdd.toString());
         if (!alreadyMember) {
           team.members.push(memberIdToAdd);
@@ -342,6 +367,10 @@ router.patch('/:id', async (req, res, next) => {
           if (vIdx !== -1) {
             team.vacancies[vIdx].status = 'Filled';
           }
+        }
+
+        if (team.members.length >= (team.maxMembers || 6)) {
+          team.isOpen = false;
         }
 
         await team.save();

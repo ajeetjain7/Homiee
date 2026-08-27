@@ -3,6 +3,8 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const CreateTeamModal = ({ isOpen, onClose, onSuccess }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -87,7 +89,7 @@ const CreateTeamModal = ({ isOpen, onClose, onSuccess }) => {
         email: localUser.email || ''
       };
 
-      const res = await axios.post('http://localhost:5000/api/teams/create', payload, config);
+      const res = await axios.post(`${API_BASE}/api/teams/create`, payload, config);
 
       toast.success('🎉 SIH Squad created successfully!');
       onClose();

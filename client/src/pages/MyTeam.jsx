@@ -5,7 +5,14 @@ import toast from 'react-hot-toast';
 import { io } from 'socket.io-client';
 import CreateTeamModal from '../components/CreateTeamModal';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const getApiBase = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return `${window.location.protocol}//${window.location.hostname}:5000`;
+  }
+  return 'http://localhost:5000';
+};
+const API_BASE = getApiBase();
 
 const MyTeam = ({ currentUser }) => {
   const [teams, setTeams] = useState([]);
@@ -128,9 +135,13 @@ const MyTeam = ({ currentUser }) => {
       })
       .catch(err => console.warn('Could not preload messages:', err.message));
 
-    // 2. Connect Socket.IO for cross-device real-time sync
+    // 2. Connect Socket.IO for cross-device real-time sync with robust reconnects
     const socket = io(API_BASE, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000
     });
     socketRef.current = socket;
 
@@ -160,8 +171,36 @@ const MyTeam = ({ currentUser }) => {
       setSocketConnected(false);
     });
 
+    socket.on('connect_error', (err) => {
+      console.warn('Socket connect error:', err.message);
+    });
+
+    // 3. Fallback background sync (2.5s) to guarantee zero missed messages on firewalled or unstable connections
+    const syncInterval = setInterval(() => {
+      if (activeTeam?._id) {
+        axios.get(`${API_BASE}/api/teams/${activeTeam._id}/messages`)
+          .then(res => {
+            if (Array.isArray(res.data) && res.data.length > 0) {
+              setMessages(prev => {
+                const map = new Map(prev.map(m => [m._id, m]));
+                let changed = false;
+                res.data.forEach(m => {
+                  if (!map.has(m._id)) {
+                    map.set(m._id, m);
+                    changed = true;
+                  }
+                });
+                return changed ? Array.from(map.values()).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)) : prev;
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    }, 2500);
+
     return () => {
       socket.disconnect();
+      clearInterval(syncInterval);
     };
   }, [activeTeam?._id]);
 
@@ -169,6 +208,79 @@ const MyTeam = ({ currentUser }) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Leader Management Controls
+  const [isEditingTeam, setIsEditingTeam] = useState(false);
+  const [editTeamForm, setEditTeamForm] = useState({
+    name: '',
+    psCode: '',
+    problemStatementTitle: '',
+    description: '',
+    sihTheme: '',
+    organization: ''
+  });
+
+  const openEditModal = () => {
+    if (!activeTeam) return;
+    setEditTeamForm({
+      name: activeTeam.name || '',
+      psCode: activeTeam.psCode || '',
+      problemStatementTitle: activeTeam.problemStatementTitle || '',
+      description: activeTeam.description || '',
+      sihTheme: activeTeam.sihTheme || '',
+      organization: activeTeam.organization || ''
+    });
+    setIsEditingTeam(true);
+  };
+
+  const handleSaveTeamEdit = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      await axios.put(`${API_BASE}/api/teams/${activeTeam._id}`, {
+        userId: localUser?._id,
+        ...editTeamForm
+      }, config);
+      toast.success('Squad details updated successfully!');
+      setIsEditingTeam(false);
+      fetchMyTeams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update squad.');
+    }
+  };
+
+  const handleKickMember = async (targetMemberId, memberName) => {
+    if (!window.confirm(`Are you sure you want to remove ${memberName} from this squad?`)) return;
+    try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      await axios.post(`${API_BASE}/api/teams/${activeTeam._id}/kick`, {
+        userId: localUser?._id,
+        targetMemberId
+      }, config);
+      toast.success(`Removed ${memberName} from squad.`);
+      fetchMyTeams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove member.');
+    }
+  };
+
+  const handleDeleteTeam = async () => {
+    if (!window.confirm(`Are you sure you want to permanently delete "${activeTeam.name}"? This action cannot be undone.`)) return;
+    try {
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        data: { userId: localUser?._id }
+      };
+      await axios.delete(`${API_BASE}/api/teams/${activeTeam._id}`, config);
+      toast.success('Squad deleted successfully.');
+      fetchMyTeams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete squad.');
+    }
+  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -408,6 +520,29 @@ const MyTeam = ({ currentUser }) => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Leader Management Action Buttons */}
+            {leaderObj && localUser && (
+              (leaderObj._id && leaderObj._id.toString() === localUser._id?.toString()) ||
+              (leaderObj.email && localUser.email && leaderObj.email.toLowerCase() === localUser.email.toLowerCase()) ||
+              (activeTeam.leaderName && localUser.name && activeTeam.leaderName.toLowerCase() === localUser.name.toLowerCase()) ||
+              (activeTeam.leader && activeTeam.leader.toString() === localUser._id?.toString())
+            ) && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={openEditModal}
+                  className="bg-[#070D18] hover:bg-[#1E293B] border border-[#334155] hover:border-amber-500 text-xs font-mono text-amber-300 font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
+                >
+                  ⚙️ Edit Squad
+                </button>
+                <button
+                  onClick={handleDeleteTeam}
+                  className="bg-[#3B1115] hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-mono font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
+                >
+                  🗑️ Delete Squad
+                </button>
+              </div>
+            )}
+
             <span className="bg-[#0E3A2F] border border-[#059669]/60 text-[#34D399] font-mono text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md">
               <span className="w-2 h-2 rounded-full bg-[#34D399] animate-pulse" />
               {memberCount}/{maxMembers} MEMBERS CONFIRMED
@@ -460,6 +595,14 @@ const MyTeam = ({ currentUser }) => {
             const memberName = member.name || (member.isLeader ? 'Squad Leader' : `Teammate ${idx + 1}`);
             const memberInitials = memberName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
             const isUserHimself = localUser && (localUser._id === member._id || localUser.name === member.name || (localUser.email && localUser.email === member.email));
+            const isCallerLeader = Boolean(
+              leaderObj && localUser && (
+                (leaderObj._id && leaderObj._id.toString() === localUser._id?.toString()) ||
+                (leaderObj.email && localUser.email && leaderObj.email.toLowerCase() === localUser.email.toLowerCase()) ||
+                (activeTeam.leaderName && localUser.name && activeTeam.leaderName.toLowerCase() === localUser.name.toLowerCase()) ||
+                (activeTeam.leader && activeTeam.leader.toString() === localUser._id?.toString())
+              )
+            );
 
             return (
               <div
@@ -490,11 +633,22 @@ const MyTeam = ({ currentUser }) => {
                     )}
                   </div>
 
-                  {member.gender && (
-                    <span className="text-[10px] font-mono text-[#94A3B8] bg-[#070D18] px-2 py-0.5 rounded border border-[#1E293B]">
-                      {member.gender}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {isCallerLeader && !member.isLeader && (
+                      <button
+                        onClick={() => handleKickMember(member._id, memberName)}
+                        className="text-[10px] font-mono font-bold text-rose-400 hover:text-rose-200 bg-rose-950/60 border border-rose-800/60 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                      >
+                        ✕ Kick
+                      </button>
+                    )}
+
+                    {member.gender && (
+                      <span className="text-[10px] font-mono text-[#94A3B8] bg-[#070D18] px-2 py-0.5 rounded border border-[#1E293B]">
+                        {member.gender}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Member Name & Academic Details */}
@@ -613,8 +767,19 @@ const MyTeam = ({ currentUser }) => {
         </div>
 
         {/* Chat Box Container */}
-        <div className="bg-[#0B132B] border border-[#1E293B] rounded-3xl shadow-2xl flex flex-col h-[460px] overflow-hidden">
+        <div className="bg-[#0B132B] border border-[#1E293B] rounded-3xl shadow-2xl flex flex-col h-[480px] overflow-hidden">
           
+          {/* 3-Day Retention Notice Bar */}
+          <div className="bg-[#070D18] border-b border-[#1E293B] px-5 py-2 flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
+            <div className="flex items-center gap-2">
+              <span className="text-amber-400 text-xs">🕒</span>
+              <span className="text-[#CBD5E1]">Chat history is automatically deleted after 3 days.</span>
+            </div>
+            <span className="text-[10px] bg-[#17130A] border border-[#785412] text-[#FBBF24] px-2 py-0.5 rounded font-bold uppercase tracking-wider hidden sm:inline-block">
+              3-Day Retention
+            </span>
+          </div>
+
           {/* Chat Messages List */}
           <div className="flex-1 p-6 overflow-y-auto space-y-4">
             {messages.length === 0 ? (
@@ -690,6 +855,114 @@ const MyTeam = ({ currentUser }) => {
         onClose={() => setShowCreateModal(false)}
         onSuccess={() => fetchMyTeams()}
       />
+
+      {/* Leader Edit Squad Details Modal */}
+      {isEditingTeam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto font-sans">
+          <div className="bg-[#0B132B] border border-[#F59E0B]/50 rounded-3xl max-w-2xl w-full shadow-2xl relative my-8 overflow-hidden text-white">
+            <div className="bg-[#050A14] border-b border-[#1E293B] px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-500 text-black font-black flex items-center justify-center text-base">
+                  ⚙️
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-white">Edit Squad Details</h2>
+                  <p className="text-[11px] font-mono text-[#CBD5E1]">Update Problem Statement & Information</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditingTeam(false)}
+                className="text-[#94A3B8] hover:text-white text-xl font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTeamEdit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-[#CBD5E1] mb-1 font-bold">Squad Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editTeamForm.name}
+                  onChange={(e) => setEditTeamForm({ ...editTeamForm, name: e.target.value })}
+                  className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-[#CBD5E1] mb-1 font-bold">PS Code</label>
+                  <input
+                    type="text"
+                    required
+                    value={editTeamForm.psCode}
+                    onChange={(e) => setEditTeamForm({ ...editTeamForm, psCode: e.target.value })}
+                    className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-[#CBD5E1] mb-1 font-bold">SIH Theme</label>
+                  <input
+                    type="text"
+                    value={editTeamForm.sihTheme}
+                    onChange={(e) => setEditTeamForm({ ...editTeamForm, sihTheme: e.target.value })}
+                    className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-[#CBD5E1] mb-1 font-bold">Problem Statement Title</label>
+                <input
+                  type="text"
+                  required
+                  value={editTeamForm.problemStatementTitle}
+                  onChange={(e) => setEditTeamForm({ ...editTeamForm, problemStatementTitle: e.target.value })}
+                  className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-[#CBD5E1] mb-1 font-bold">Ministry / Organization</label>
+                <input
+                  type="text"
+                  value={editTeamForm.organization}
+                  onChange={(e) => setEditTeamForm({ ...editTeamForm, organization: e.target.value })}
+                  className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-[#CBD5E1] mb-1 font-bold">Squad Description & Roadmap</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={editTeamForm.description}
+                  onChange={(e) => setEditTeamForm({ ...editTeamForm, description: e.target.value })}
+                  className="w-full bg-[#070D18] border border-[#334155] focus:border-amber-500 rounded-xl p-3 text-xs text-white outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1E293B]">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTeam(false)}
+                  className="bg-[#070D18] hover:bg-[#1E293B] border border-[#334155] text-[#CBD5E1] text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-black px-6 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

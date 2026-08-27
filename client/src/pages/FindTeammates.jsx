@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const DEFAULT_CANDIDATES = [
   {
     _id: 'seed_1',
@@ -176,7 +178,7 @@ const FindTeammates = ({ currentUser }) => {
         psCode: selectedPsCode === 'All PS Codes' ? '' : selectedPsCode
       });
 
-      const res = await axios.get(`http://localhost:5000/api/auth/teammates?${queryParams.toString()}`);
+      const res = await axios.get(`${API_BASE}/api/auth/teammates?${queryParams.toString()}`);
       let fetchedList = res.data;
 
       if (!fetchedList || fetchedList.length === 0) {
@@ -237,10 +239,23 @@ const FindTeammates = ({ currentUser }) => {
   const [mySquads, setMySquads] = useState([]);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [expandedCandidate, setExpandedCandidate] = useState(null);
   const [selectedSquadId, setSelectedSquadId] = useState('');
   const [inviteRole, setInviteRole] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
   const [sendingInvite, setSendingInvite] = useState(false);
+
+  // Close expanded card on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setExpandedCandidate(null);
+        setInviteModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Fetch logged in user's squads for inviting
   const fetchMySquads = async () => {
@@ -251,7 +266,7 @@ const FindTeammates = ({ currentUser }) => {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         params: { userId: localUser?._id, email: localUser?.email, userName: localUser?.name }
       };
-      const res = await axios.get('http://localhost:5000/api/teams/team', config);
+      const res = await axios.get(`${API_BASE}/api/teams/team`, config);
       if (res.data?.teams && res.data.teams.length > 0) {
         setMySquads(res.data.teams);
         setSelectedSquadId(res.data.teams[0]._id);
@@ -313,7 +328,7 @@ const FindTeammates = ({ currentUser }) => {
         message: inviteMessage
       };
 
-      await axios.post('http://localhost:5000/api/requests', payload, config);
+      await axios.post(`${API_BASE}/api/requests`, payload, config);
 
       toast.success(`🎉 Invitation sent to ${selectedCandidate.name} for ${targetSquad.name}!`);
       setInviteModalOpen(false);
@@ -493,7 +508,8 @@ const FindTeammates = ({ currentUser }) => {
           return (
             <div
               key={c._id || idx}
-              className={`bg-[#0B132B] border rounded-2xl p-6 relative flex flex-col justify-between space-y-4 shadow-xl backdrop-blur-xl transition-all hover:border-[#475569] ${
+              onClick={() => setExpandedCandidate(c)}
+              className={`bg-[#0B132B] border rounded-2xl p-6 relative flex flex-col justify-between space-y-4 shadow-xl backdrop-blur-xl transition-all hover:border-[#F59E0B]/70 hover:shadow-amber-500/10 cursor-pointer group ${
                 isUserCard ? 'border-amber-500 shadow-amber-500/10 ring-1 ring-amber-500/30' : 'border-[#1E293B]'
               }`}
             >
@@ -510,16 +526,21 @@ const FindTeammates = ({ currentUser }) => {
                   )}
                 </div>
 
-                {isUserCard ? (
-                  <span className="bg-[#0E3A2F] border border-[#059669]/60 text-[#34D399] text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#34D399] animate-pulse" />
-                    YOU
+                <div className="flex items-center gap-1.5">
+                  {isUserCard ? (
+                    <span className="bg-[#0E3A2F] border border-[#059669]/60 text-[#34D399] text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#34D399] animate-pulse" />
+                      YOU
+                    </span>
+                  ) : (
+                    <span className="bg-[#0C2A4A] border border-[#0284C7]/50 text-[#38BDF8] text-[10px] font-mono font-bold px-2 py-0.5 rounded">
+                      {c.sihReadinessScore || 85}% READINESS
+                    </span>
+                  )}
+                  <span className="text-[10px] text-[#94A3B8] group-hover:text-amber-400 font-mono transition-colors">
+                    🔍 Expand
                   </span>
-                ) : (
-                  <span className="bg-[#0C2A4A] border border-[#0284C7]/50 text-[#38BDF8] text-[10px] font-mono font-bold px-2 py-0.5 rounded">
-                    {c.sihReadinessScore || 85}% READINESS
-                  </span>
-                )}
+                </div>
               </div>
 
               {/* Teammate Header Info */}
@@ -528,17 +549,17 @@ const FindTeammates = ({ currentUser }) => {
                   <img
                     src={c.photoUrl || c.avatar}
                     alt={c.name}
-                    className="w-12 h-12 rounded-xl object-cover border border-[#F59E0B]/50 shadow-md"
+                    className="w-12 h-12 rounded-xl object-cover border border-[#F59E0B]/50 shadow-md group-hover:scale-105 transition-transform"
                     onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black flex items-center justify-center text-base shadow-md">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black flex items-center justify-center text-base shadow-md group-hover:scale-105 transition-transform">
                     {initials}
                   </div>
                 )}
 
-                <div className="space-y-1">
-                  <h3 className="font-black text-white text-base tracking-tight leading-snug">{c.name}</h3>
+                <div className="space-y-1 flex-1">
+                  <h3 className="font-black text-white text-base tracking-tight leading-snug group-hover:text-amber-400 transition-colors">{c.name}</h3>
                   <p className="text-xs text-[#E2E8F0] font-medium">
                     🎓 {c.college || 'College / Institute'}
                   </p>
@@ -587,7 +608,7 @@ const FindTeammates = ({ currentUser }) => {
               <div className="space-y-1">
                 <span className="text-[10px] font-mono text-[#94A3B8] block uppercase font-bold">VERIFIED SKILLS</span>
                 <div className="flex flex-wrap gap-1.5">
-                  {(c.technicalSkills || ['React', 'Node.js', 'PPT Making']).map((s, i) => (
+                  {(c.technicalSkills || ['React', 'Node.js', 'PPT Making']).slice(0, 6).map((s, i) => (
                     <span key={i} className="bg-[#070D18] border border-[#334155] text-[#E2E8F0] text-[10px] font-mono px-2 py-0.5 rounded">
                       {s}
                     </span>
@@ -596,7 +617,7 @@ const FindTeammates = ({ currentUser }) => {
               </div>
 
               {/* External Credentials & CP Ratings */}
-              <div className="flex items-center gap-3 pt-2 border-t border-[#1E293B] text-xs font-mono">
+              <div className="flex items-center gap-3 pt-2 border-t border-[#1E293B] text-xs font-mono" onClick={(e) => e.stopPropagation()}>
                 {c.github && (
                   <a href={c.github} target="_blank" rel="noreferrer" className="text-[#CBD5E1] hover:text-white transition-colors" title="GitHub">
                     🐙 GitHub
@@ -615,25 +636,246 @@ const FindTeammates = ({ currentUser }) => {
               </div>
 
               {/* Action Button */}
-              {isUserCard ? (
-                <button
-                  onClick={() => window.location.href = '/profile'}
-                  className="w-full bg-[#17130A] border border-[#F59E0B]/70 hover:border-[#F59E0B] text-[#FBBF24] font-mono font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all"
-                >
-                  ⚙️ Manage Your Teammate Card
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleOpenInvite(c)}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-[#000000] font-black text-xs py-2.5 rounded-xl cursor-pointer transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-                >
-                  ⚡ Invite to Squad
-                </button>
-              )}
+              <div onClick={(e) => e.stopPropagation()}>
+                {isUserCard ? (
+                  <button
+                    onClick={() => window.location.href = '/profile'}
+                    className="w-full bg-[#17130A] border border-[#F59E0B]/70 hover:border-[#F59E0B] text-[#FBBF24] font-mono font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all"
+                  >
+                    ⚙️ Manage Your Teammate Card
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleOpenInvite(c)}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-[#000000] font-black text-xs py-2.5 rounded-xl cursor-pointer transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+                  >
+                    ⚡ Invite to Squad
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+
+      {/* EXPANDED LARGE PROFILE CARD MODAL */}
+      {expandedCandidate && (() => {
+        const isSelf = localUser && (localUser._id === expandedCandidate._id || localUser.email === expandedCandidate.email);
+        const expInitials = expandedCandidate.name ? expandedCandidate.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'IN';
+
+        return (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto"
+            onClick={() => setExpandedCandidate(null)}
+          >
+            <div 
+              className="bg-[#0B132B] border border-[#F59E0B]/60 rounded-3xl max-w-2xl w-full shadow-2xl relative my-8 overflow-hidden text-white animate-in fade-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Top Banner Gradient */}
+              <div className="h-24 bg-gradient-to-r from-amber-600/30 via-orange-600/20 to-amber-500/10 border-b border-[#1E293B] relative flex items-center justify-between px-6">
+                <div className="flex items-center gap-2">
+                  <span className="bg-[#17130A] border border-[#F59E0B] text-[#FBBF24] text-xs font-mono font-bold px-3 py-1 rounded-xl">
+                    ⚡ {expandedCandidate.primaryRole || 'Fullstack Developer'}
+                  </span>
+                  {expandedCandidate.gender && (
+                    <span className="bg-[#070D18] border border-[#334155] text-[#CBD5E1] text-xs font-mono px-2.5 py-1 rounded-xl">
+                      {expandedCandidate.gender}
+                    </span>
+                  )}
+                  {expandedCandidate.sihReadinessScore && (
+                    <span className="bg-[#0C2A4A] border border-[#0284C7]/50 text-[#38BDF8] text-xs font-mono font-bold px-2.5 py-1 rounded-xl">
+                      {expandedCandidate.sihReadinessScore}% READINESS
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setExpandedCandidate(null)}
+                  className="w-9 h-9 rounded-full bg-[#070D18]/80 hover:bg-[#1E293B] border border-[#334155] text-white flex items-center justify-center text-lg font-bold cursor-pointer transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Profile Main Body */}
+              <div className="p-6 md:p-8 space-y-6 -mt-10">
+                {/* Avatar + Main Name & Academic Info */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                  {expandedCandidate.photoUrl || expandedCandidate.avatar ? (
+                    <img
+                      src={expandedCandidate.photoUrl || expandedCandidate.avatar}
+                      alt={expandedCandidate.name}
+                      className="w-20 h-20 rounded-2xl object-cover border-2 border-amber-400 shadow-xl bg-[#070D18]"
+                      onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black flex items-center justify-center text-2xl shadow-xl border-2 border-amber-400">
+                      {expInitials}
+                    </div>
+                  )}
+
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-2xl font-black text-white tracking-tight">{expandedCandidate.name}</h2>
+                      {isSelf && (
+                        <span className="bg-[#0E3A2F] border border-[#059669]/60 text-[#34D399] text-[10px] font-mono font-bold px-2 py-0.5 rounded">
+                          YOU
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-[#E2E8F0] font-medium">
+                      🎓 {expandedCandidate.college || 'College / Institute'}
+                    </p>
+                    <p className="text-xs font-mono text-[#CBD5E1]">
+                      {expandedCandidate.year || '3rd Year'} • {expandedCandidate.classBranch || 'Computer Science'} {expandedCandidate.section ? `(${expandedCandidate.section})` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Contact Coordinates (High Contrast) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#070D18] border border-[#1E293B] p-4 rounded-2xl">
+                  {expandedCandidate.email && (
+                    <div className="flex items-center gap-2 text-xs font-mono">
+                      <span className="text-amber-400">✉️</span>
+                      <span className="text-[#CBD5E1] truncate select-all">{expandedCandidate.email}</span>
+                    </div>
+                  )}
+                  {expandedCandidate.whatsappNumber && (
+                    <div className="flex items-center gap-2 text-xs font-mono text-[#34D399]">
+                      <span>📱</span>
+                      <a 
+                        href={`https://wa.me/${expandedCandidate.whatsappNumber.replace(/[^0-9]/g, '')}`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="hover:underline font-bold"
+                      >
+                        WhatsApp: {expandedCandidate.whatsappNumber}
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* About / Pitch Statement */}
+                {expandedCandidate.about && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-mono text-[#F59E0B] font-bold uppercase tracking-wider block">
+                      💬 ABOUT & HACKATHON PITCH
+                    </span>
+                    <p className="text-xs sm:text-sm text-[#E2E8F0] leading-relaxed bg-[#070D18] border border-[#1E293B] p-4 rounded-2xl">
+                      {expandedCandidate.about}
+                    </p>
+                  </div>
+                )}
+
+                {/* Core Capabilities */}
+                {expandedCandidate.capabilities && expandedCandidate.capabilities.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-mono text-[#94A3B8] font-bold uppercase tracking-wider block">
+                      ⚡ CORE CAPABILITIES & STRENGTHS
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {expandedCandidate.capabilities.map((cap, i) => (
+                        <span
+                          key={i}
+                          className={`text-xs font-mono px-3 py-1 rounded-xl border ${
+                            cap.includes('PPT')
+                              ? 'bg-[#261E0C] border-[#F59E0B] text-[#FBBF24] font-bold'
+                              : 'bg-[#070D18] border-[#334155] text-[#E2E8F0]'
+                          }`}
+                        >
+                          {cap.includes('PPT') ? '📊 ' : '⚡ '}
+                          {cap}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Technical Skills */}
+                {expandedCandidate.technicalSkills && expandedCandidate.technicalSkills.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-mono text-[#94A3B8] font-bold uppercase tracking-wider block">
+                      🛠️ VERIFIED TECHNICAL SKILLS
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {expandedCandidate.technicalSkills.map((s, i) => (
+                        <span key={i} className="bg-[#070D18] border border-[#334155] text-[#E2E8F0] text-xs font-mono px-3 py-1 rounded-xl">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* SIH Themes of Interest */}
+                {expandedCandidate.sihThemes && expandedCandidate.sihThemes.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-mono text-[#94A3B8] font-bold uppercase tracking-wider block">
+                      🎯 INTERESTED SIH THEMES
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {expandedCandidate.sihThemes.map((th, i) => (
+                        <span key={i} className="bg-[#102A45] border border-[#0284C7]/60 text-[#38BDF8] text-xs font-mono px-3 py-1 rounded-xl">
+                          🏛️ {th}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* External Handles & Ratings */}
+                <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-[#1E293B] text-xs font-mono">
+                  {expandedCandidate.github && (
+                    <a href={expandedCandidate.github} target="_blank" rel="noreferrer" className="text-[#CBD5E1] hover:text-white flex items-center gap-1.5 transition-colors">
+                      <span>🐙</span> GitHub Profile
+                    </a>
+                  )}
+                  {expandedCandidate.linkedin && (
+                    <a href={expandedCandidate.linkedin} target="_blank" rel="noreferrer" className="text-[#38BDF8] hover:underline flex items-center gap-1.5">
+                      <span>💼</span> LinkedIn Profile
+                    </a>
+                  )}
+                  {expandedCandidate.portfolio && (
+                    <a href={expandedCandidate.portfolio} target="_blank" rel="noreferrer" className="text-[#34D399] hover:underline flex items-center gap-1.5">
+                      <span>🌐</span> Portfolio Website
+                    </a>
+                  )}
+                  {expandedCandidate.leetcodeRating && expandedCandidate.leetcodeRating !== 'N/A' && (
+                    <span className="text-amber-400 font-bold flex items-center gap-1.5">
+                      <span>🏆</span> LeetCode: {expandedCandidate.leetcodeRating}
+                    </span>
+                  )}
+                </div>
+
+                {/* Primary Action Button inside Expanded Card */}
+                <div className="pt-2">
+                  {isSelf ? (
+                    <button
+                      onClick={() => window.location.href = '/profile'}
+                      className="w-full bg-[#17130A] hover:bg-[#261E0C] border border-[#F59E0B] text-[#FBBF24] font-mono font-bold text-sm py-3 rounded-2xl cursor-pointer transition-all shadow-lg"
+                    >
+                      ⚙️ Edit Your Profile Information
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        const target = expandedCandidate;
+                        setExpandedCandidate(null);
+                        handleOpenInvite(target);
+                      }}
+                      className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-sm py-3.5 rounded-2xl cursor-pointer transition-all shadow-xl shadow-amber-500/20 active:scale-[0.99] flex items-center justify-center gap-2"
+                    >
+                      ⚡ Invite {expandedCandidate.name} to Squad
+                    </button>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Invite To Squad Modal Popup */}
       {inviteModalOpen && selectedCandidate && (

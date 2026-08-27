@@ -28,6 +28,8 @@ const SIH_THEMES = [
   'Open Innovation / Miscellaneous'
 ];
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const Profile = ({ onUpdateUser }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [user, setUser] = useState(() => {
@@ -88,7 +90,7 @@ const Profile = ({ onUpdateUser }) => {
         yearAndBranch: `${form.year || '3rd Year'} • ${form.classBranch || 'Computer Science'}${form.section ? ` (${form.section})` : ''}`
       };
 
-      const res = await axios.put('http://localhost:5000/api/auth/profile', payload);
+      const res = await axios.put(`${API_BASE}/api/auth/profile`, payload);
       setUser(res.data);
       localStorage.setItem('userInfo', JSON.stringify(res.data));
       if (onUpdateUser) onUpdateUser(res.data);

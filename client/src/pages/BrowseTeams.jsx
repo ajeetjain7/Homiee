@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const BrowseTeams = () => {
   const [teams, setTeams] = useState([]);
   const [search, setSearch] = useState('');
@@ -35,7 +37,7 @@ const BrowseTeams = () => {
         skills: selectedSkill === 'All Skills' ? '' : selectedSkill
       });
 
-      const res = await axios.get(`http://localhost:5000/api/teams?${queryParams.toString()}`);
+      const res = await axios.get(`${API_BASE}/api/teams?${queryParams.toString()}`);
       setTeams(res.data);
     } catch (err) {
       console.error('Error fetching teams:', err);
@@ -52,9 +54,10 @@ const BrowseTeams = () => {
     if (!selectedTeamForRequest) return;
 
     try {
-      await axios.post(`http://localhost:5000/api/teams/${selectedTeamForRequest._id}/request`, {
+      await axios.post(`${API_BASE}/api/teams/${selectedTeamForRequest._id}/request`, {
         userId: user._id || 'user_sih_2026',
         userName: user.name || 'Applicant',
+        email: user.email || '',
         role: selectedTeamForRequest.vacancies?.[0]?.roleName || 'Contributor',
         pitchNote,
         proofOfWork: user.github || user.portfolio || ''

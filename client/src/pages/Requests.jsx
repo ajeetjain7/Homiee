@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const Requests = () => {
   const [tab, setTab] = useState('received');
   const [incomingInvites, setIncomingInvites] = useState([]);
@@ -41,7 +43,7 @@ const Requests = () => {
 
       // 1. Fetch direct invitations sent to this user from /api/requests/incoming
       try {
-        const res = await axios.get('http://localhost:5000/api/requests/incoming', config);
+        const res = await axios.get(`${API_BASE}/api/requests/incoming`, config);
         console.log('📌 [LOG POINT 4: FRONTEND RECEIVED INCOMING REQUESTS]:', res.data);
         setIncomingInvites(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
@@ -50,7 +52,7 @@ const Requests = () => {
 
       // 2. Fetch applications sent to teams led by this user from /api/teams
       try {
-        const teamsRes = await axios.get('http://localhost:5000/api/teams/team', config);
+        const teamsRes = await axios.get(`${API_BASE}/api/teams/team`, config);
         const mySquads = teamsRes.data?.teams || (teamsRes.data?.team ? [teamsRes.data.team] : []);
         const pendingSquadReqs = mySquads.flatMap(t => 
           (t.requests || []).filter(r => r.status === 'pending').map(r => ({
@@ -68,7 +70,7 @@ const Requests = () => {
 
       // 3. Fetch sent requests from /api/requests/sent
       try {
-        const sentRes = await axios.get('http://localhost:5000/api/requests/sent', config);
+        const sentRes = await axios.get(`${API_BASE}/api/requests/sent`, config);
         console.log('🚀 [Requests.jsx] Sent requests received from /api/requests/sent:', sentRes.data);
         setSentRequests(Array.isArray(sentRes.data) ? sentRes.data : []);
       } catch (err) {
@@ -100,7 +102,7 @@ const Requests = () => {
     setActionLoading(prev => ({ ...prev, [requestId]: true }));
     try {
       const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      const res = await axios.patch(`http://localhost:5000/api/requests/${requestId}`, { action }, config);
+      const res = await axios.patch(`${API_BASE}/api/requests/${requestId}`, { action }, config);
 
       if (action === 'accept') {
         toast.success(`🎉 Invitation accepted! You are now part of ${res.data?.request?.teamName || 'the squad'}.`);
@@ -120,7 +122,7 @@ const Requests = () => {
   const handleTeamApplicantAction = async (teamId, requestId, action) => {
     setActionLoading(prev => ({ ...prev, [requestId]: true }));
     try {
-      const res = await axios.post(`http://localhost:5000/api/teams/${teamId}/request/${requestId}/action`, { action });
+      const res = await axios.post(`${API_BASE}/api/teams/${teamId}/request/${requestId}/action`, { action, userId: user?._id });
       toast.success(res.data?.message || `Applicant request ${action}ed!`);
       fetchAllRequests();
     } catch (err) {

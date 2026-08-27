@@ -15,15 +15,23 @@ const server = http.createServer(app);
 // Essential when hosted behind reverse proxies (Render, Vercel, Nginx) so real user IPs are tracked
 app.set('trust proxy', 1);
 
-// Initialize Socket.io with CORS configuration
+// Initialize Socket.io with production-ready CORS & WebSocket fallbacks
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    credentials: true
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling']
 });
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  credentials: true
+}));
 app.use(express.json());
 
 // 1. High-Capacity General API Rate Limiter (Allows 3000 requests per 15 min per user/IP)
@@ -53,74 +61,109 @@ const teamMessages = {};
 
 // Socket.io Real-time Team Chat
 io.on('connection', (socket) => {
-  // Join squad chat room
+  // Join squad chat room (Enforces 3-day message retention policy)
   socket.on('join_team', async ({ teamId, user }) => {
     if (!teamId) return;
-    const room = `team_${teamId}`;
-    socket.join(room);
+    const tid = teamId.toString();
+    socket.join(`team_${tid}`);
+    socket.join(tid);
     
     try {
+      const Message = require('./models/Message');
       const Team = require('./models/Team');
-      const teamDoc = await Team.findById(teamId).select('messages').lean();
-      const dbMessages = (teamDoc?.messages || []).map(m => ({
-        _id: m._id ? m._id.toString() : `msg_${Date.now()}`,
-        teamId,
+      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+      // Clean up any old array messages older than 3 days in Team document
+      Team.findByIdAndUpdate(tid, {
+        $pull: { messages: { createdAt: { $lt: threeDaysAgo } } }
+      }).exec().catch(() => {});
+
+      // Query valid messages created within the last 3 days
+      const ttlMessages = await Message.find({
+        teamId: tid,
+        createdAt: { $gte: threeDaysAgo }
+      }).sort({ createdAt: 1 }).lean();
+
+      let dbMessages = ttlMessages.map(m => ({
+        _id: m._id.toString(),
+        teamId: tid,
         message: m.message,
         user: m.user,
-        createdAt: m.createdAt || new Date().toISOString()
+        createdAt: m.createdAt.toISOString()
       }));
+
+      // If Message collection empty, fallback to Team.messages filtered to 3-day window
+      if (dbMessages.length === 0) {
+        const teamDoc = await Team.findById(tid).select('messages').lean();
+        dbMessages = (teamDoc?.messages || [])
+          .filter(m => new Date(m.createdAt || Date.now()) >= threeDaysAgo)
+          .map(m => ({
+            _id: m._id ? m._id.toString() : `msg_${Date.now()}`,
+            teamId: tid,
+            message: m.message,
+            user: m.user,
+            createdAt: m.createdAt || new Date().toISOString()
+          }));
+      }
+
       socket.emit('initial_messages', dbMessages);
     } catch {
-      if (teamMessages[room]) {
-        socket.emit('initial_messages', teamMessages[room]);
+      if (teamMessages[`team_${tid}`]) {
+        socket.emit('initial_messages', teamMessages[`team_${tid}`]);
       }
     }
   });
 
-  // Send message to squad chat room
+  // Send message to squad chat room (Saved to MongoDB FIRST, then emitted)
   socket.on('send_message', async ({ teamId, message, user }) => {
     if (!teamId || !message || !message.trim()) return;
-    const room = `team_${teamId}`;
-    const msgPayload = {
-      _id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      teamId,
-      message: message.trim(),
-      user: {
-        _id: user?._id || 'anonymous',
-        name: user?.name || 'Teammate',
-        avatar: user?.avatar || user?.photoUrl || '',
-        role: user?.primaryRole || user?.role || 'Member'
-      },
-      createdAt: new Date().toISOString()
+    const tid = teamId.toString();
+    const now = new Date();
+
+    const senderData = {
+      _id: user?._id || 'anonymous',
+      name: user?.name || 'Teammate',
+      email: user?.email || '',
+      avatar: user?.avatar || user?.photoUrl || '',
+      role: user?.primaryRole || user?.role || 'Member'
     };
 
-    // 1. Save to MongoDB
+    // 1. SAVE TO MONGODB FIRST BEFORE EMITTING
     try {
+      const Message = require('./models/Message');
       const Team = require('./models/Team');
-      await Team.findByIdAndUpdate(teamId, {
+
+      const savedMsgDoc = await Message.create({
+        teamId: tid,
+        user: senderData,
+        message: message.trim(),
+        createdAt: now
+      });
+
+      await Team.findByIdAndUpdate(tid, {
         $push: {
           messages: {
-            user: msgPayload.user,
-            message: msgPayload.message,
-            createdAt: new Date(msgPayload.createdAt)
+            _id: savedMsgDoc._id,
+            user: senderData,
+            message: message.trim(),
+            createdAt: now
           }
         }
-      });
+      }).catch(() => {});
+
+      const msgPayload = {
+        _id: savedMsgDoc._id.toString(),
+        teamId: tid,
+        message: savedMsgDoc.message,
+        user: savedMsgDoc.user,
+        createdAt: savedMsgDoc.createdAt.toISOString()
+      };
+
+      // 2. EMIT SAVED MESSAGE IN REAL-TIME TO ALL CONNECTED SQUAD MEMBERS ACROSS BOTH ROOM ALIASES
+      io.to(`team_${tid}`).to(tid).emit('receive_message', msgPayload);
     } catch (err) {
-      console.warn('Could not persist message to MongoDB:', err.message);
+      console.error('Failed to save message to MongoDB before emit:', err);
     }
-
-    // 2. Cache in memory
-    if (!teamMessages[room]) {
-      teamMessages[room] = [];
-    }
-    teamMessages[room].push(msgPayload);
-    if (teamMessages[room].length > 100) {
-      teamMessages[room].shift();
-    }
-
-    // 3. Emit in real-time to all connected sockets in this squad room
-    io.to(room).emit('receive_message', msgPayload);
   });
 });
 

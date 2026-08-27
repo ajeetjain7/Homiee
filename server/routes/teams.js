@@ -238,7 +238,44 @@ const handleGetMyTeam = async (req, res, next) => {
 router.get('/my-team', handleGetMyTeam);
 router.get('/team', handleGetMyTeam);
 
-// 2. CREATE A NEW TEAM
+// Helper to compute total active team memberships (leader + accepted member)
+const getUserActiveTeamCount = async (userId, userEmail, userName) => {
+  let userIds = [];
+  if (userId) {
+    userIds.push(userId);
+    userIds.push(userId.toString());
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      userIds.push(new mongoose.Types.ObjectId(userId));
+    }
+  }
+  if (userEmail) {
+    const u = await User.findOne({ email: userEmail.toLowerCase().trim() });
+    if (u) {
+      userIds.push(u._id);
+      userIds.push(u._id.toString());
+    }
+    userIds.push(userEmail.toLowerCase().trim());
+  }
+  if (userName) {
+    const u = await User.findOne({ name: userName.trim() });
+    if (u) {
+      userIds.push(u._id);
+      userIds.push(u._id.toString());
+    }
+    userIds.push(userName.trim());
+  }
+
+  const count = await Team.countDocuments({
+    $or: [
+      { leader: { $in: userIds } },
+      { members: { $in: userIds } }
+    ]
+  });
+
+  return count;
+};
+
+// 2. CREATE A NEW TEAM (Enforces Maximum 3 Teams Per Person in Total)
 router.post('/create', async (req, res, next) => {
   try {
     const { 
@@ -295,16 +332,10 @@ router.post('/create', async (req, res, next) => {
 
     const finalLeaderId = leaderDoc ? leaderDoc._id : callerId;
 
-    // Check maximum 3 teams per account
-    const existingTeamsCount = await Team.countDocuments({ 
-      $or: [
-        { leader: finalLeaderId },
-        { leader: callerId }
-      ]
-    });
-
-    if (existingTeamsCount >= 3) {
-      return res.status(400).json({ message: 'Limit reached! Maximum 3 teams allowed per account.' });
+    // Check maximum 3 active teams per person in total
+    const activeTeamCount = await getUserActiveTeamCount(finalLeaderId, email || leaderDoc?.email, userName || leaderDoc?.name);
+    if (activeTeamCount >= 3) {
+      return res.status(400).json({ message: 'Limit reached: Maximum 3 active teams allowed per person.' });
     }
 
     const newTeam = await Team.create({
@@ -332,7 +363,7 @@ router.post('/create', async (req, res, next) => {
   }
 });
 
-// 3. ATOMIC JOIN REQUEST (Prevents Lock & Race Conditions Under High Traffic)
+// 3. ATOMIC JOIN REQUEST (Enforces Team Capacity & Maximum 3 Teams Per Person)
 router.post('/:teamId/request', async (req, res, next) => {
   try {
     const { teamId } = req.params;
@@ -350,9 +381,15 @@ router.post('/:teamId/request', async (req, res, next) => {
     if (!team) return res.status(404).json({ message: 'Team not found.' });
     if (!team.isOpen) return res.status(400).json({ message: 'Team roster is full.' });
 
-    // Check if user is already a member
+    // Check if user is already a member of this team
     if (Array.isArray(team.members) && team.members.some(m => (m?._id || m).toString() === callerId.toString())) {
       return res.status(400).json({ message: 'You are already a member of this squad.' });
+    }
+
+    // Check if applicant is already a member of 3 teams
+    const applicantTeamCount = await getUserActiveTeamCount(callerId, email, userName);
+    if (applicantTeamCount >= 3) {
+      return res.status(400).json({ message: 'Limit reached: You are already a member of 3 teams.' });
     }
 
     // Check existing pending request
@@ -380,11 +417,13 @@ router.post('/:teamId/request', async (req, res, next) => {
   }
 });
 
-// 4. ACCEPT OR REJECT JOIN REQUEST (Atomic & Vacancy-Aware)
+// 4. ACCEPT OR REJECT JOIN REQUEST (Atomic, Vacancy-Aware & 3-Team Constraint)
 router.post('/:teamId/request/:requestId/action', async (req, res, next) => {
   try {
     const { teamId, requestId } = req.params;
-    const { action } = req.body; // 'accept' or 'reject'
+    const { action, userId } = req.body; // 'accept' or 'reject'
+
+    const callerId = userId || extractUserId(req);
 
     let team = null;
     if (mongoose.Types.ObjectId.isValid(teamId)) {
@@ -394,6 +433,12 @@ router.post('/:teamId/request/:requestId/action', async (req, res, next) => {
     }
 
     if (!team) return res.status(404).json({ message: 'Team not found.' });
+
+    // Verify caller is team leader
+    const leaderIdStr = (team.leader?._id || team.leader || '').toString();
+    if (callerId && leaderIdStr !== callerId.toString()) {
+      return res.status(403).json({ message: 'Forbidden: Only the team leader can accept or reject requests.' });
+    }
 
     // Safely locate request subdocument
     let request = null;
@@ -407,13 +452,21 @@ router.post('/:teamId/request/:requestId/action', async (req, res, next) => {
     if (action === 'accept') {
       if (!Array.isArray(team.members)) team.members = [];
       if (team.members.length >= (team.maxMembers || 6)) {
-        return res.status(400).json({ message: 'Team is already full!' });
+        return res.status(400).json({ message: 'Team is already full (maximum 6 members)!' });
+      }
+
+      // Check applicant active team limit (3 max)
+      const applicantUser = request.user?._id || request.user;
+      if (applicantUser) {
+        const applicantActiveCount = await getUserActiveTeamCount(applicantUser);
+        if (applicantActiveCount >= 3) {
+          return res.status(400).json({ message: 'Cannot accept: Applicant is already a member of 3 teams.' });
+        }
       }
 
       request.status = 'accepted';
 
       // Add user to members if not present
-      const applicantUser = request.user?._id || request.user;
       if (applicantUser) {
         const alreadyMember = team.members.some(m => (m?._id || m).toString() === applicantUser.toString());
         if (!alreadyMember) {
@@ -448,22 +501,34 @@ router.post('/:teamId/request/:requestId/action', async (req, res, next) => {
   }
 });
 
-// 5. KICK MEMBER FROM TEAM
+// 5. KICK MEMBER FROM TEAM (Leader Management Control)
 router.post('/:teamId/kick', async (req, res, next) => {
   try {
     const { teamId } = req.params;
     const { userId, targetMemberId } = req.body;
 
+    const callerId = userId || extractUserId(req);
+    if (!callerId) return res.status(401).json({ message: 'Authentication required.' });
+
     const team = await Team.findById(teamId);
     if (!team) return res.status(404).json({ message: 'Team not found.' });
 
-    if (team.leader.toString() !== userId) {
-      return res.status(403).json({ message: 'Only team leaders can kick members.' });
+    const leaderIdStr = (team.leader?._id || team.leader || '').toString();
+    if (leaderIdStr !== callerId.toString()) {
+      return res.status(403).json({ message: 'Forbidden: Only the team leader can remove members.' });
     }
 
-    team.members = team.members.filter(m => m.toString() !== targetMemberId);
+    if (!targetMemberId) {
+      return res.status(400).json({ message: 'Target member ID is required.' });
+    }
+
+    if (targetMemberId.toString() === leaderIdStr) {
+      return res.status(400).json({ message: 'Team leader cannot remove themselves from the team. To disband, delete the team.' });
+    }
+
+    team.members = team.members.filter(m => (m?._id || m).toString() !== targetMemberId.toString());
     if (team.coLeaders) {
-      team.coLeaders = team.coLeaders.filter(cl => cl.toString() !== targetMemberId);
+      team.coLeaders = team.coLeaders.filter(cl => (cl?._id || cl).toString() !== targetMemberId.toString());
     }
     team.isOpen = true; // Re-open roster space
 
@@ -474,23 +539,71 @@ router.post('/:teamId/kick', async (req, res, next) => {
       .populate('members', 'name role primaryRole avatar email')
       .lean();
 
-    res.status(200).json({ message: 'Member removed from team.', team: updatedTeam });
+    res.status(200).json({ message: 'Member removed from squad.', team: updatedTeam });
   } catch (error) {
     next(error);
   }
 });
 
-// 6. MAKE CO-LEADER
+// 6. EDIT TEAM DETAILS (Leader Management Control)
+router.put('/:teamId', async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const { 
+      userId, 
+      name, 
+      tagline, 
+      description, 
+      psCode, 
+      problemStatementTitle, 
+      sihTheme, 
+      organization, 
+      vacancies, 
+      criticalSkills,
+      isOpen 
+    } = req.body;
+
+    const callerId = userId || extractUserId(req);
+    const team = await Team.findById(teamId);
+    if (!team) return res.status(404).json({ message: 'Team not found.' });
+
+    const leaderIdStr = (team.leader?._id || team.leader || '').toString();
+    if (leaderIdStr !== (callerId || '').toString()) {
+      return res.status(403).json({ message: 'Forbidden: Only the team leader can edit team information.' });
+    }
+
+    if (name) team.name = name.trim();
+    if (tagline !== undefined) team.tagline = tagline.trim();
+    if (description) team.description = description.trim();
+    if (psCode) team.psCode = psCode.trim();
+    if (problemStatementTitle) team.problemStatementTitle = problemStatementTitle.trim();
+    if (sihTheme) team.sihTheme = sihTheme;
+    if (organization !== undefined) team.organization = organization.trim();
+    if (vacancies) team.vacancies = vacancies;
+    if (criticalSkills) team.criticalSkills = criticalSkills;
+    if (isOpen !== undefined) team.isOpen = Boolean(isOpen);
+
+    await team.save();
+
+    res.status(200).json({ message: 'Team details updated successfully!', team });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// 7. MAKE CO-LEADER
 router.post('/:teamId/co-leader', async (req, res, next) => {
   try {
     const { teamId } = req.params;
     const { userId, targetMemberId } = req.body;
 
+    const callerId = userId || extractUserId(req);
     const team = await Team.findById(teamId);
     if (!team) return res.status(404).json({ message: 'Team not found.' });
 
-    if (team.leader.toString() !== userId) {
-      return res.status(403).json({ message: 'Only the main leader can promote co-leaders.' });
+    const leaderIdStr = (team.leader?._id || team.leader || '').toString();
+    if (leaderIdStr !== (callerId || '').toString()) {
+      return res.status(403).json({ message: 'Forbidden: Only the main leader can promote co-leaders.' });
     }
 
     if (!team.coLeaders) team.coLeaders = [];
@@ -511,17 +624,19 @@ router.post('/:teamId/co-leader', async (req, res, next) => {
   }
 });
 
-// 7. DELETE A TEAM
+// 8. DELETE A TEAM (Leader Management Control)
 router.delete('/:teamId', async (req, res, next) => {
   try {
     const { teamId } = req.params;
     const { userId } = req.body;
 
+    const callerId = userId || extractUserId(req);
     const team = await Team.findById(teamId);
     if (!team) return res.status(404).json({ message: 'Team not found.' });
 
-    if (team.leader.toString() !== userId) {
-      return res.status(403).json({ message: 'Only the team leader can delete this team.' });
+    const leaderIdStr = (team.leader?._id || team.leader || '').toString();
+    if (leaderIdStr !== (callerId || '').toString()) {
+      return res.status(403).json({ message: 'Forbidden: Only the team leader can delete this team.' });
     }
 
     await Team.findByIdAndDelete(teamId);
@@ -531,20 +646,47 @@ router.delete('/:teamId', async (req, res, next) => {
   }
 });
 
-// 8. GET SQUAD CHAT MESSAGES (Persistent History)
+// 9. GET SQUAD CHAT MESSAGES (Enforces 3-day automatic retention policy)
 router.get('/:teamId/messages', async (req, res, next) => {
   try {
     const { teamId } = req.params;
-    const team = await Team.findById(teamId).select('messages').lean();
-    if (!team) return res.status(404).json({ message: 'Squad not found.' });
+    const Message = require('../models/Message');
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
-    const formattedMessages = (team.messages || []).map(m => ({
-      _id: m._id ? m._id.toString() : `msg_${Date.now()}`,
+    // Clean up any old array messages older than 3 days in Team document
+    Team.findByIdAndUpdate(teamId, {
+      $pull: { messages: { createdAt: { $lt: threeDaysAgo } } }
+    }).exec().catch(() => {});
+
+    // Query messages created in the last 3 days
+    const ttlMessages = await Message.find({
+      teamId,
+      createdAt: { $gte: threeDaysAgo }
+    }).sort({ createdAt: 1 }).lean();
+
+    let formattedMessages = ttlMessages.map(m => ({
+      _id: m._id.toString(),
       teamId,
       message: m.message,
       user: m.user,
-      createdAt: m.createdAt || new Date().toISOString()
+      createdAt: m.createdAt.toISOString()
     }));
+
+    // Fallback to Team.messages array filtered to 3-day retention
+    if (formattedMessages.length === 0) {
+      const team = await Team.findById(teamId).select('messages').lean();
+      if (!team) return res.status(404).json({ message: 'Squad not found.' });
+
+      formattedMessages = (team.messages || [])
+        .filter(m => new Date(m.createdAt || Date.now()) >= threeDaysAgo)
+        .map(m => ({
+          _id: m._id ? m._id.toString() : `msg_${Date.now()}`,
+          teamId,
+          message: m.message,
+          user: m.user,
+          createdAt: m.createdAt || new Date().toISOString()
+        }));
+    }
 
     res.status(200).json(formattedMessages);
   } catch (error) {
@@ -552,7 +694,7 @@ router.get('/:teamId/messages', async (req, res, next) => {
   }
 });
 
-// 9. POST SQUAD CHAT MESSAGE (Persistent Message Dispatch)
+// 10. POST SQUAD CHAT MESSAGE (Persistent Dispatch with 3-Day TTL)
 router.post('/:teamId/messages', async (req, res, next) => {
   try {
     const { teamId } = req.params;
@@ -562,7 +704,11 @@ router.post('/:teamId/messages', async (req, res, next) => {
       return res.status(400).json({ message: 'Message content is required.' });
     }
 
+    const Message = require('../models/Message');
+    const now = new Date();
+
     const msgDoc = {
+      teamId,
       user: {
         _id: user?._id || 'anonymous',
         name: user?.name || 'Teammate',
@@ -571,25 +717,22 @@ router.post('/:teamId/messages', async (req, res, next) => {
         role: user?.primaryRole || user?.role || 'Member'
       },
       message: message.trim(),
-      createdAt: new Date()
+      createdAt: now
     };
 
-    const team = await Team.findByIdAndUpdate(
+    const savedTTLMessage = await Message.create(msgDoc);
+
+    await Team.findByIdAndUpdate(
       teamId,
-      { $push: { messages: msgDoc } },
-      { new: true }
+      { $push: { messages: msgDoc } }
     );
 
-    if (!team) return res.status(404).json({ message: 'Squad not found.' });
-
-    const savedMsg = team.messages[team.messages.length - 1];
-
     res.status(201).json({
-      _id: savedMsg._id.toString(),
+      _id: savedTTLMessage._id.toString(),
       teamId,
-      message: savedMsg.message,
-      user: savedMsg.user,
-      createdAt: savedMsg.createdAt.toISOString()
+      message: savedTTLMessage.message,
+      user: savedTTLMessage.user,
+      createdAt: savedTTLMessage.createdAt.toISOString()
     });
   } catch (error) {
     next(error);

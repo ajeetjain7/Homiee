@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import CreateTeamModal from './CreateTeamModal';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const Navbar = ({ user: propUser, onOpenSetup }) => {
   const navigate = useNavigate();
@@ -32,7 +34,7 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           params: { userId: user._id, email: user.email, userName: user.name }
         };
-        const res = await axios.get('http://localhost:5000/api/requests/incoming', config);
+        const res = await axios.get(`${API_BASE}/api/requests/incoming`, config);
         if (Array.isArray(res.data)) {
           setUnreadCount(res.data.length);
         }

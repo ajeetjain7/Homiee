@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const OAuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -29,7 +31,7 @@ const OAuthCallback = () => {
 
           // Fetch fresh user profile from /api/auth/me
           try {
-            const meRes = await axios.get('http://localhost:5000/api/auth/me', {
+            const meRes = await axios.get(`${API_BASE}/api/auth/me`, {
               headers: { Authorization: `Bearer ${token}` }
             });
             if (meRes.data) {
