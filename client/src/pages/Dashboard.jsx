@@ -65,7 +65,7 @@ const Dashboard = () => {
   // Fetch Teams Live from Express/MongoDB Backend
   const fetchTeams = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/api/teams?search=${encodeURIComponent(searchQuery)}`);
+      const res = await axios.get(`${VITE_API_URL}/api/teams?search=${encodeURIComponent(searchQuery)}`);
       setTeams(res.data);
     } catch (err) {
       console.error('Error fetching teams:', err);
