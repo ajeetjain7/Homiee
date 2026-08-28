@@ -31,7 +31,7 @@ const OAuthCallback = () => {
 
           // Fetch fresh user profile from /api/auth/me
           try {
-            const meRes = await axios.get(`${VITE_API_URL}/api/auth/me`, {
+            const meRes = await axios.get(`${API_BASE}/api/auth/me`, {
               headers: { Authorization: `Bearer ${token}` }
             });
             if (meRes.data) {
