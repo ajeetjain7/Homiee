@@ -83,7 +83,7 @@ const OnboardingModal = ({ user, onComplete }) => {
     return { percentage: Math.min(score, 100), items };
   };
 
-  const { percentage: completionPercent, items: completionItems } = calculateCompleteness();
+  const { percentage: completionPercent } = calculateCompleteness();
 
   const toggleCapability = (cap) => {
     setFormData(prev => {
@@ -119,28 +119,21 @@ const OnboardingModal = ({ user, onComplete }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!formData.name.trim() || !formData.college.trim() || !formData.classBranch.trim()) {
-      toast.error('Please complete required academic fields in Step 1.');
-      setStep(1);
-      return;
-    }
-    if (!formData.about.trim()) {
-      toast.error('Please provide a brief bio/pitch in Step 3.');
-      setStep(3);
-      return;
-    }
-
     setLoading(true);
 
+    // Fallbacks provided for missing values so incomplete forms don't break database queries
     const payload = {
       userId: user?._id || 'user_' + Date.now(),
       ...formData,
+      name: formData.name.trim() || user?.name || 'Anonymous User',
+      college: formData.college.trim() || user?.college || 'IET DAVV',
+      classBranch: formData.classBranch.trim() || user?.classBranch || 'Computer Science',
+      about: formData.about.trim() || 'No bio provided yet.',
       photoUrl: user?.photoUrl || user?.avatar || formData.photoUrl || '',
       avatar: user?.avatar || user?.photoUrl || formData.avatar || '',
       profileComplete: true,
       isProfileComplete: true,
-      yearAndBranch: `${formData.year} • ${formData.classBranch}${formData.section ? ` (${formData.section})` : ''}`
+      yearAndBranch: `${formData.year} • ${formData.classBranch || 'CS'}${formData.section ? ` (${formData.section})` : ''}`
     };
 
     try {
@@ -149,14 +142,14 @@ const OnboardingModal = ({ user, onComplete }) => {
         localStorage.setItem('token', res.data.token);
       }
       localStorage.setItem('userInfo', JSON.stringify(res.data));
-      toast.success('🎉 Profile completed! Your teammate card is now live across SIH Finder!');
+      toast.success('🎉 Profile saved! Your teammate card is live.');
       if (onComplete) onComplete(res.data);
       navigate('/teammates');
     } catch (err) {
       console.warn('Backend offline or error, saving profile locally:', err);
       const localUser = { ...user, ...payload };
       localStorage.setItem('userInfo', JSON.stringify(localUser));
-      toast.success('🎉 Preferences saved! Welcome to SIH Teammate Discovery!');
+      toast.success('🎉 Preferences saved locally!');
       if (onComplete) onComplete(localUser);
       navigate('/teammates');
     } finally {
@@ -181,6 +174,15 @@ const OnboardingModal = ({ user, onComplete }) => {
           </div>
           
           <div className="flex items-center gap-3">
+            {/* Direct Skip Button */}
+            <button
+              type="button"
+              onClick={() => navigate('/teammates')}
+              className="text-xs font-mono text-gray-400 hover:text-amber-400 underline cursor-pointer mr-2"
+            >
+              Skip for now
+            </button>
+
             {/* Live Progress Indicator */}
             <div className="text-right hidden sm:block">
               <span className="text-[10px] font-mono font-bold text-[#F59E0B] block">{completionPercent}% COMPLETE</span>
@@ -212,7 +214,7 @@ const OnboardingModal = ({ user, onComplete }) => {
             onClick={() => setStep(2)} 
             className={`py-2.5 px-4 text-center border-r border-gray-800 transition-colors ${step === 2 ? 'text-[#F59E0B] bg-amber-500/10' : 'text-gray-400 hover:text-white'}`}
           >
-            2. Role & PPT / Tech Skills
+            2. Role & Tech Skills
           </button>
           <button 
             type="button"
@@ -230,30 +232,28 @@ const OnboardingModal = ({ user, onComplete }) => {
           {step === 1 && (
             <div className="space-y-4">
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-300">
-                📌 Enter your college, branch, section, and year so teammates from your institute and across India can discover and invite you to squads.
+                📌 Enter your college details so teammates can discover your profile card on the feed.
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Full Name *</label>
+                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Full Name</label>
                   <input
                     type="text"
-                    required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. Enter Your Name"
+                    placeholder="e.g. Shivam Purohit"
                     className="w-full bg-[#070D18] border border-gray-700 focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">College / Institute *</label>
+                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">College / Institute</label>
                   <input
                     type="text"
-                    required
                     value={formData.college}
                     onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                    placeholder="e.g. IET DAVV / NIT Trichy / IIT Delhi"
+                    placeholder="e.g. IET DAVV"
                     className="w-full bg-[#070D18] border border-gray-700 focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all"
                   />
                 </div>
@@ -261,25 +261,23 @@ const OnboardingModal = ({ user, onComplete }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Class / Degree & Branch *</label>
+                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Class & Branch</label>
                   <input
                     type="text"
-                    required
                     value={formData.classBranch}
                     onChange={(e) => setFormData({ ...formData, classBranch: e.target.value })}
-                    placeholder="e.g. B.Tech Computer Science / MCA / IT / ECE"
+                    placeholder="e.g. B.Tech Computer Science"
                     className="w-full bg-[#070D18] border border-gray-700 focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Section / Division *</label>
+                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Section / Division</label>
                   <input
                     type="text"
-                    required
                     value={formData.section}
                     onChange={(e) => setFormData({ ...formData, section: e.target.value })}
-                    placeholder="e.g. Section A, Section B, CS-2"
+                    placeholder="e.g. Section A"
                     className="w-full bg-[#070D18] border border-gray-700 focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all"
                   />
                 </div>
@@ -287,7 +285,7 @@ const OnboardingModal = ({ user, onComplete }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Academic Year *</label>
+                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Academic Year</label>
                   <select
                     value={formData.year}
                     onChange={(e) => setFormData({ ...formData, year: e.target.value })}
@@ -302,7 +300,7 @@ const OnboardingModal = ({ user, onComplete }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Gender *</label>
+                  <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Gender</label>
                   <select
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
@@ -322,7 +320,7 @@ const OnboardingModal = ({ user, onComplete }) => {
           {step === 2 && (
             <div className="space-y-5">
               <div>
-                <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Primary Technical Role *</label>
+                <label className="block text-xs font-mono text-gray-400 mb-1.5 font-bold uppercase">Primary Technical Role</label>
                 <select
                   value={formData.primaryRole}
                   onChange={(e) => setFormData({ ...formData, primaryRole: e.target.value })}
@@ -344,9 +342,8 @@ const OnboardingModal = ({ user, onComplete }) => {
               {/* Capabilities Multi-Select Chips */}
               <div>
                 <label className="block text-xs font-mono text-gray-400 mb-1 font-bold uppercase">
-                  Your Squad Capabilities (Select all that apply) *
+                  Your Squad Capabilities
                 </label>
-                <p className="text-[11px] text-gray-500 mb-2">Showcase whether you excel at PPT creation, pitch deck delivery, frontend, backend, or AI modeling.</p>
                 <div className="flex flex-wrap gap-2">
                   {POPULAR_CAPABILITIES.map((cap) => {
                     const selected = formData.capabilities.includes(cap);
@@ -372,7 +369,7 @@ const OnboardingModal = ({ user, onComplete }) => {
               {/* Technical Skills Tag Manager */}
               <div className="space-y-2">
                 <label className="block text-xs font-mono text-gray-400 mb-1 font-bold uppercase">
-                  Technical & Design Skills (Add your stack)
+                  Technical & Design Skills
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -385,7 +382,7 @@ const OnboardingModal = ({ user, onComplete }) => {
                         addSkill(customSkill);
                       }
                     }}
-                    placeholder="Type skill & press Enter (e.g. PPT Making, Figma, React)..."
+                    placeholder="Type skill & press Enter..."
                     className="flex-1 bg-[#070D18] border border-gray-700 focus:border-[#F59E0B] rounded-xl px-3.5 py-2 text-xs text-white outline-none"
                   />
                   <button
@@ -442,7 +439,7 @@ const OnboardingModal = ({ user, onComplete }) => {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-mono text-gray-400 font-bold uppercase">
-                    About You & Teammate Pitch *
+                    About You & Teammate Pitch
                   </label>
                   <span className={`text-[10px] font-mono ${formData.about.length >= 480 ? 'text-rose-400 font-bold' : 'text-gray-400'}`}>
                     {formData.about.length} / 500 characters
@@ -450,11 +447,10 @@ const OnboardingModal = ({ user, onComplete }) => {
                 </div>
                 <textarea
                   rows={3}
-                  required
                   maxLength={500}
                   value={formData.about}
                   onChange={(e) => setFormData({ ...formData, about: e.target.value })}
-                  placeholder="Introduce yourself! E.g. Passionate developer and pitch deck creator with 3 hackathons experience. Expert in fullstack and PPT presentations..."
+                  placeholder="Introduce yourself briefly (optional)..."
                   className="w-full bg-[#070D18] border border-gray-700 focus:border-[#F59E0B] rounded-xl p-3 text-xs text-white outline-none"
                 />
               </div>
@@ -510,7 +506,7 @@ const OnboardingModal = ({ user, onComplete }) => {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-mono text-gray-400 mb-1 font-bold">Portfolio / Project Demo Link</label>
+                  <label className="block text-[11px] font-mono text-gray-400 mb-1 font-bold">Portfolio / Project Link</label>
                   <input
                     type="url"
                     value={formData.portfolio}
@@ -526,7 +522,7 @@ const OnboardingModal = ({ user, onComplete }) => {
                     type="text"
                     value={formData.leetcodeRating}
                     onChange={(e) => setFormData({ ...formData, leetcodeRating: e.target.value })}
-                    placeholder="e.g. 1850 / Knight / 5-Star"
+                    placeholder="e.g. 1850 / Knight"
                     className="w-full bg-[#070D18] border border-gray-700 focus:border-[#F59E0B] rounded-xl px-3 py-2 text-xs text-white outline-none"
                   />
                 </div>
@@ -549,13 +545,7 @@ const OnboardingModal = ({ user, onComplete }) => {
             {step < 3 ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (step === 1 && (!formData.name || !formData.college || !formData.classBranch)) {
-                    toast.error('Please fill in required academic details.');
-                    return;
-                  }
-                  setStep(step + 1);
-                }}
+                onClick={() => setStep(step + 1)}
                 className="bg-[#F59E0B] hover:bg-[#E08D00] text-black font-extrabold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
               >
                 Continue Next →
@@ -579,4 +569,3 @@ const OnboardingModal = ({ user, onComplete }) => {
 };
 
 export default OnboardingModal;
-
