@@ -144,7 +144,7 @@ const OnboardingModal = ({ user, onComplete }) => {
     };
 
     try {
-      const res = await axios.put(`${API_BASE}/api/auth/profile`, payload);
+      const res = await axios.put(`${VITE_API_URL}/api/auth/profile`, payload);
       if (res.data.token) {
         localStorage.setItem('token', res.data.token);
       }
