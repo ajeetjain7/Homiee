@@ -141,7 +141,8 @@ const MyTeam = ({ currentUser }) => {
       withCredentials: true,
       reconnection: true,
       reconnectionAttempts: 10,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      auth: { token }
     });
     socketRef.current = socket;
 
@@ -149,7 +150,8 @@ const MyTeam = ({ currentUser }) => {
       setSocketConnected(true);
       socket.emit('join_team', {
         teamId: activeTeam._id,
-        user: localUser
+        user: localUser,
+        token
       });
     });
 
@@ -173,6 +175,11 @@ const MyTeam = ({ currentUser }) => {
 
     socket.on('connect_error', (err) => {
       console.warn('Socket connect error:', err.message);
+    });
+
+    socket.on('error', (err) => {
+      console.warn('Socket error:', err);
+      toast.error(err?.message || 'Squad chat error.');
     });
 
     // 3. Fallback background sync (2.5s) to guarantee zero missed messages on firewalled or unstable connections
@@ -326,7 +333,8 @@ const MyTeam = ({ currentUser }) => {
       socketRef.current.emit('send_message', {
         teamId: activeTeam._id,
         message: messageText,
-        user: senderPayload
+        user: senderPayload,
+        token
       });
     } else {
       // Direct REST fallback with MongoDB persistence
