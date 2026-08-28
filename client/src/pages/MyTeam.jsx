@@ -282,6 +282,31 @@ const MyTeam = ({ currentUser }) => {
     }
   };
 
+  // Voluntary Member Leave Squad State & Handler
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leavingTeam, setLeavingTeam] = useState(false);
+
+  const handleLeaveTeam = async () => {
+    if (!activeTeam) return;
+    setLeavingTeam(true);
+    try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      await axios.post(`${API_BASE}/api/teams/${activeTeam._id}/leave`, {
+        userId: localUser?._id,
+        email: localUser?.email,
+        userName: localUser?.name
+      }, config);
+      toast.success(`You have left "${activeTeam.name}".`);
+      setShowLeaveModal(false);
+      fetchMyTeams();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to leave squad.');
+    } finally {
+      setLeavingTeam(false);
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputMessage.trim() || !activeTeam?._id) return;
@@ -544,7 +569,7 @@ const MyTeam = ({ currentUser }) => {
               (leaderObj.email && localUser.email && leaderObj.email.toLowerCase() === localUser.email.toLowerCase()) ||
               (activeTeam.leaderName && localUser.name && activeTeam.leaderName.toLowerCase() === localUser.name.toLowerCase()) ||
               (activeTeam.leader && activeTeam.leader.toString() === localUser._id?.toString())
-            ) && (
+            ) ? (
               <div className="flex items-center gap-2">
                 <button
                   onClick={openEditModal}
@@ -559,6 +584,16 @@ const MyTeam = ({ currentUser }) => {
                   🗑️ Delete Squad
                 </button>
               </div>
+            ) : (
+              /* Voluntary Member Leave Squad Button */
+              localUser && (
+                <button
+                  onClick={() => setShowLeaveModal(true)}
+                  className="bg-[#2A1215] hover:bg-rose-950 border border-rose-800/70 text-rose-300 text-xs font-mono font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
+                >
+                  🚪 Leave Squad
+                </button>
+              )
             )}
 
             <span className="bg-[#0E3A2F] border border-[#059669]/60 text-[#34D399] font-mono text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md">
@@ -978,6 +1013,52 @@ const MyTeam = ({ currentUser }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Squad Confirmation Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#0B132B] border border-[#1E293B] max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-5 relative">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 text-xl font-black">
+                🚪
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Leave Squad Confirmation</h3>
+                <p className="text-xs text-[#94A3B8] font-mono">Voluntary Member Exit</p>
+              </div>
+            </div>
+
+            <div className="bg-[#070D18] border border-[#1E293B] p-4 rounded-xl space-y-2">
+              <p className="text-xs text-[#CBD5E1] leading-relaxed">
+                Are you sure you want to leave <span className="text-white font-bold">"{activeTeam.name}"</span>?
+              </p>
+              <p className="text-[11px] text-[#94A3B8]">
+                • You will be removed from this squad's roster and team chat.<br />
+                • You will free up your active squad slot and can join or create another squad anytime.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLeaveModal(false)}
+                disabled={leavingTeam}
+                className="bg-[#070D18] hover:bg-[#1E293B] border border-[#334155] text-xs font-mono text-[#CBD5E1] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleLeaveTeam}
+                disabled={leavingTeam}
+                className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-rose-600/20 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {leavingTeam ? 'Leaving Squad...' : 'Yes, Leave Squad'}
+              </button>
+            </div>
           </div>
         </div>
       )}

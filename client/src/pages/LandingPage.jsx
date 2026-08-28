@@ -69,15 +69,11 @@ const LandingPage = () => {
         </div>
 
         {/* High-Contrast Live Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-5xl pt-10">
-          <div className="bg-[#0B132B] border border-[#1E293B] hover:border-amber-500/50 p-5 rounded-2xl text-left space-y-1 transition-all shadow-xl">
-            <div className="text-3xl font-black text-[#F59E0B]">1,420+</div>
-            <div className="text-xs font-mono font-bold text-[#E2E8F0] uppercase tracking-wider">SIH Teams Formed</div>
-            <p className="text-[11px] text-[#94A3B8]">Across all 50+ central ministries</p>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 justify-center w-full max-w-5xl pt-10">
+          
 
           <div className="bg-[#0B132B] border border-[#1E293B] hover:border-amber-500/50 p-5 rounded-2xl text-left space-y-1 transition-all shadow-xl">
-            <div className="text-3xl font-black text-[#38BDF8]">280+</div>
+            <div className="text-3xl font-black text-[#38BDF8]">200+</div>
             <div className="text-xs font-mono font-bold text-[#E2E8F0] uppercase tracking-wider">Problem Statements</div>
             <p className="text-[11px] text-[#94A3B8]">Software & Hardware editions</p>
           </div>

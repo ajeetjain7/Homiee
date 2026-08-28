@@ -536,6 +536,91 @@ router.post('/:teamId/kick', async (req, res, next) => {
   }
 });
 
+// 5B. LEAVE TEAM (Voluntary Member Action)
+router.post('/:teamId/leave', async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const { userId, email, userName } = req.body;
+
+    const callerId = userId || extractUserId(req);
+    if (!callerId && !email && !userName) {
+      return res.status(401).json({ message: 'Authentication required to leave squad.' });
+    }
+
+    const team = await Team.findById(teamId);
+    if (!team) {
+      return res.status(404).json({ message: 'Team not found.' });
+    }
+
+    // Resolve user identifiers (ObjectId, string ID, Email)
+    let userIds = [];
+    if (callerId) {
+      userIds.push(callerId.toString());
+      if (mongoose.Types.ObjectId.isValid(callerId)) {
+        userIds.push(new mongoose.Types.ObjectId(callerId));
+      }
+    }
+    if (email) userIds.push(email.toLowerCase().trim());
+    if (userName) userIds.push(userName.trim());
+
+    if (callerId && mongoose.Types.ObjectId.isValid(callerId)) {
+      const uDoc = await User.findById(callerId);
+      if (uDoc) {
+        userIds.push(uDoc._id.toString());
+        if (uDoc.email) userIds.push(uDoc.email.toLowerCase().trim());
+      }
+    }
+
+    const leaderIdStr = (team.leader?._id || team.leader || '').toString();
+    const leaderEmailStr = (team.leader?.email || '').toLowerCase().trim();
+    const leaderNameStr = (team.leaderName || '').toLowerCase().trim();
+
+    // Prevent team leader from leaving without deleting or transferring ownership
+    const isLeader = userIds.some(uid => 
+      uid.toString() === leaderIdStr ||
+      (leaderEmailStr && uid.toString().toLowerCase() === leaderEmailStr) ||
+      (leaderNameStr && uid.toString().toLowerCase() === leaderNameStr)
+    );
+
+    if (isLeader) {
+      return res.status(400).json({ 
+        message: 'Team leader cannot leave the squad. To disband the squad, delete it from Squad Settings.' 
+      });
+    }
+
+    // Check if user is actually a member
+    const initialMemberCount = Array.isArray(team.members) ? team.members.length : 0;
+    team.members = (team.members || []).filter(m => {
+      const mStr = (m?._id || m || '').toString();
+      const mEmail = (m?.email || '').toLowerCase().trim();
+      return !userIds.some(uid => uid.toString() === mStr || (mEmail && uid.toString().toLowerCase() === mEmail));
+    });
+
+    if (team.members.length === initialMemberCount) {
+      return res.status(400).json({ message: 'You are not a member of this squad.' });
+    }
+
+    if (team.coLeaders) {
+      team.coLeaders = team.coLeaders.filter(cl => {
+        const clStr = (cl?._id || cl || '').toString();
+        return !userIds.some(uid => uid.toString() === clStr);
+      });
+    }
+
+    team.isOpen = true; // Open up vacancy
+
+    await team.save();
+
+    res.status(200).json({ 
+      message: `You have successfully left squad "${team.name}".`, 
+      teamId: team._id 
+    });
+  } catch (error) {
+    console.error('Leave Team Error:', error);
+    next(error);
+  }
+});
+
 // 6. EDIT TEAM DETAILS (Leader Management Control)
 router.put('/:teamId', async (req, res, next) => {
   try {

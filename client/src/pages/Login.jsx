@@ -18,10 +18,6 @@ const Login = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const [isSignUp, setIsSignUp] = useState(() => searchParams.get('mode') === 'signup');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -53,6 +49,7 @@ const Login = () => {
 
       toast.success(`Welcome, ${res.data.name || 'Innovator'}!`);
 
+      // Server-driven profile completeness verification
       const isComplete = Boolean(res.data.profileComplete || res.data.isProfileComplete);
       if (!isComplete) {
         navigate('/teammates', { state: { openSetup: true } });
@@ -68,96 +65,6 @@ const Login = () => {
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Email & Password Submit Handler
-  const handleEmailAuth = async (e) => {
-    e.preventDefault();
-    if (!email || !password) {
-      toast.error('Please provide email and password.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const endpoint = isSignUp 
-        ? `${API_BASE}/api/auth/register` 
-        : `${API_BASE}/api/auth/login`;
-
-      const payload = isSignUp ? { name, email, password } : { email, password };
-      const res = await axios.post(endpoint, payload);
-
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('userInfo', JSON.stringify(res.data));
-
-      toast.success(isSignUp ? 'Account created successfully!' : `Welcome back, ${res.data.name || 'Innovator'}!`);
-
-      const isComplete = Boolean(res.data.profileComplete || res.data.isProfileComplete);
-      if (!isComplete) {
-        navigate('/teammates', { state: { openSetup: true } });
-      } else {
-        navigate('/teammates');
-      }
-    } catch (err) {
-      console.error('Email Auth Error:', err);
-      toast.error(err.response?.data?.message || 'Authentication failed. Please check credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Instant Demo Login for Offline Testing
-  const handleDemoLogin = (isNew = true) => {
-    if (isNew) {
-      const newUser = {
-        _id: 'user_' + Date.now(),
-        name: 'Aryan Sharma',
-        email: 'aryan.sharma2026@gmail.com',
-        college: '',
-        classBranch: '',
-        section: '',
-        year: '3rd Year',
-        gender: 'Male',
-        primaryRole: 'Fullstack Developer',
-        capabilities: ['PPT Making & Pitch Deck', 'Backend & APIs'],
-        technicalSkills: ['React', 'PPT Making', 'Node.js', 'MongoDB'],
-        sihThemes: ['Clean & Renewable Green Technology'],
-        about: '',
-        profileComplete: false,
-        isProfileComplete: false,
-        sihReadinessScore: 20
-      };
-      localStorage.setItem('token', 'demo_jwt_token_new');
-      localStorage.setItem('userInfo', JSON.stringify(newUser));
-      navigate('/teammates', { state: { openSetup: true } });
-    } else {
-      const existingUser = {
-        _id: 'user_sih_2026',
-        name: 'Vikramaditya Rathore',
-        email: 'vikram.sih2026@gmail.com',
-        college: 'IET DAVV, Indore',
-        classBranch: 'B.Tech Computer Science & Engineering',
-        section: 'Section B',
-        year: '3rd Year',
-        yearAndBranch: '3rd Year • B.Tech CSE (Section B)',
-        gender: 'Male',
-        primaryRole: 'Fullstack Developer',
-        capabilities: ['PPT Making & Pitch Deck', 'Frontend UI / UX', 'Backend & APIs'],
-        technicalSkills: ['React', 'Node.js', 'MongoDB', 'PPT Making', 'Canva', 'TailwindCSS'],
-        sihThemes: ['Agriculture & Rural Development', 'Smart Education & Learning'],
-        about: 'Passionate fullstack engineer & pitch presentation designer. 3 hackathons won, looking for enthusiastic teammates for SIH 2026.',
-        github: 'https://github.com/vikram-rathore',
-        linkedin: 'https://linkedin.com/in/vikram-rathore',
-        portfolio: 'https://vikramaditya.dev',
-        leetcodeRating: '1920 (Knight)',
-        profileComplete: true,
-        isProfileComplete: true,
-        sihReadinessScore: 90
-      };
-      localStorage.setItem('token', 'demo_jwt_token_existing');
-      localStorage.setItem('userInfo', JSON.stringify(existingUser));
-      navigate('/teammates');
     }
   };
 
@@ -202,13 +109,13 @@ const Login = () => {
               
               <div className="bg-[#0B132B] border border-[#1E293B] p-4 rounded-xl relative group hover:border-[#334155] transition-all">
                 <div className="absolute -top-1 left-3 w-4 h-0.5 bg-amber-500" />
-                <div className="text-2xl font-black text-white tracking-tight">1420+</div>
-                <div className="text-[10px] font-mono text-[#E2E8F0] font-bold uppercase tracking-wider mt-1">SIH SQUADS</div>
+                <div className="text-2xl font-black text-white tracking-tight">95%</div>
+                <div className="text-[10px] font-mono text-[#E2E8F0] font-bold uppercase tracking-wider mt-1">REAL SQUADS</div>
               </div>
 
               <div className="bg-[#0B132B] border border-[#1E293B] p-4 rounded-xl relative group hover:border-[#334155] transition-all">
                 <div className="absolute -top-1 left-3 w-4 h-0.5 bg-sky-500" />
-                <div className="text-2xl font-black text-white tracking-tight">280+</div>
+                <div className="text-2xl font-black text-white tracking-tight">200+</div>
                 <div className="text-[10px] font-mono text-[#E2E8F0] font-bold uppercase tracking-wider mt-1">PS STATEMENTS</div>
               </div>
 
@@ -261,113 +168,32 @@ const Login = () => {
                 </span>
               </div>
 
-              {/* Auth Mode Toggle */}
-              <div className="grid grid-cols-2 bg-[#070D18] p-1 rounded-xl border border-[#1E293B] text-xs font-mono font-bold">
+              {/* Single Google Sign-In Action */}
+              <div className="space-y-4 pt-2">
+                <p className="text-xs text-[#CBD5E1] text-center leading-relaxed">
+                  Sign in with your Google account to access your SIH squad dashboard and find teammates.
+                </p>
+
                 <button
                   type="button"
-                  onClick={() => setIsSignUp(false)}
-                  className={`py-2 rounded-lg transition-all cursor-pointer ${!isSignUp ? 'bg-[#F59E0B] text-black shadow-md' : 'text-[#94A3B8] hover:text-white'}`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsSignUp(true)}
-                  className={`py-2 rounded-lg transition-all cursor-pointer ${isSignUp ? 'bg-[#F59E0B] text-black shadow-md' : 'text-[#94A3B8] hover:text-white'}`}
-                >
-                  Create Account
-                </button>
-              </div>
-
-              {/* Google OAuth Login Button (Prominent) */}
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                className="w-full bg-[#FFFFFF] hover:bg-[#F8FAFC] text-[#0F172A] font-extrabold text-xs py-3 px-4 rounded-xl transition-all shadow-xl flex items-center justify-center gap-3 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                </svg>
-                <span>Continue with Google</span>
-              </button>
-
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-[#1E293B]"></div>
-                <span className="flex-shrink mx-3 text-[10px] font-mono text-[#94A3B8] uppercase">OR EMAIL & PASSWORD</span>
-                <div className="flex-grow border-t border-[#1E293B]"></div>
-              </div>
-
-              {/* Email & Password Form */}
-              <form onSubmit={handleEmailAuth} className="space-y-3">
-                {isSignUp && (
-                  <div>
-                    <label className="block text-[11px] font-mono text-[#CBD5E1] mb-1 font-bold">FULL NAME</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Shivam Purohit"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-[11px] font-mono text-[#CBD5E1] mb-1 font-bold">COLLEGE / PERSONAL EMAIL</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="you@college.edu or gmail.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-mono text-[#CBD5E1] mb-1 font-bold">PASSWORD</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-[#070D18] border border-[#334155] focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all"
-                  />
-                </div>
-
-                <button
-                  type="submit"
+                  onClick={handleGoogleLogin}
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-black text-xs py-3 rounded-xl transition-all shadow-lg shadow-amber-500/10 cursor-pointer disabled:opacity-50 mt-2"
+                  className="w-full bg-[#FFFFFF] hover:bg-[#F8FAFC] text-[#0F172A] font-extrabold text-sm py-3.5 px-4 rounded-xl transition-all shadow-xl flex items-center justify-center gap-3 cursor-pointer hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
                 >
-                  {loading ? 'Processing...' : (isSignUp ? 'Create Account & Continue →' : 'Sign In with Email →')}
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                  </svg>
+                  <span>{loading ? 'Authenticating...' : 'Continue with Google'}</span>
                 </button>
-              </form>
+              </div>
 
-              {/* Instant Demo Login Buttons */}
-              <div className="pt-2 border-t border-[#1E293B] space-y-2">
-                <span className="block text-[10px] font-mono text-center text-[#94A3B8] uppercase">QUICK DEMO ACCESS:</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin(true)}
-                    className="bg-[#17130A] border border-[#F59E0B]/60 hover:border-[#F59E0B] text-[#FBBF24] font-mono font-bold text-[10px] py-2 px-2.5 rounded-xl transition-all text-center cursor-pointer"
-                  >
-                    ⚡ New Innovator (Setup)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin(false)}
-                    className="bg-[#070D18] border border-[#334155] hover:border-gray-400 text-[#CBD5E1] font-mono font-bold text-[10px] py-2 px-2.5 rounded-xl transition-all text-center cursor-pointer"
-                  >
-                    👤 Existing Member
-                  </button>
-                </div>
+              {/* Security & Verification Notice */}
+              <div className="bg-[#070D18] border border-[#1E293B] p-3 rounded-xl flex items-center gap-2.5 text-[11px] font-mono text-[#94A3B8]">
+                <span className="text-emerald-400 font-bold">🔒</span>
+                <span>Direct Google OAuth verification • Official SIH 2026</span>
               </div>
 
               {/* Terms Links */}
@@ -396,4 +222,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Login;
