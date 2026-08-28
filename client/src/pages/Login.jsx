@@ -42,7 +42,7 @@ const Login = () => {
         avatar: gUser.photoURL || ''
       };
 
-      const res = await axios.post(`${API_BASE}/api/auth/google`, payload);
+      const res = await axios.post(`${VITE_API_URL}/api/auth/google`, payload);
 
       localStorage.setItem('token', res.data.token || fbToken);
       localStorage.setItem('userInfo', JSON.stringify(res.data));
