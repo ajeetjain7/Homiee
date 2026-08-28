@@ -37,7 +37,7 @@ const BrowseTeams = () => {
         skills: selectedSkill === 'All Skills' ? '' : selectedSkill
       });
 
-      const res = await axios.get(`${VITE_API_URL}/api/teams?${queryParams.toString()}`);
+      const res = await axios.get(`${API_BASE}/api/teams?${queryParams.toString()}`);
       setTeams(res.data);
     } catch (err) {
       console.error('Error fetching teams:', err);
