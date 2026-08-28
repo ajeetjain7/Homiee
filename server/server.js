@@ -26,10 +26,14 @@ app.set('trust proxy', 1);
 
 // Initialize Socket.io with secure CORS
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+    cors: {
+        origin: "https://homiee-eight.vercel.app",
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        credentials: true
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket', 'polling']
 });
 
 // Middleware
