@@ -4,7 +4,15 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { loginWithGoogle } from '../services/firebase';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const getApiBase = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:5000`;
+  }
+  return 'http://localhost:5000';
+};
+
+const API_BASE = getApiBase();
 
 const Login = () => {
   const [searchParams] = useSearchParams();

@@ -23,4 +23,3 @@ requestSchema.index({ fromUserId: 1, toUserId: 1, teamId: 1, status: 1 });
 requestSchema.index({ teamId: 1, status: 1 });
 
 module.exports = mongoose.model('Request', requestSchema);
-

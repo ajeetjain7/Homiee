@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const Team = require('../models/Team');
 const User = require('../models/User');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'homiee_super_secret_key_123';
+const JWT_SECRET = process.env.JWT_SECRET ;
 
 // Helper to extract authenticated user id from header token or query
 const extractUserId = (req) => {
