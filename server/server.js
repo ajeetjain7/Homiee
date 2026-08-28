@@ -38,8 +38,8 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors({
-  origin: true,
-  credentials: true
+    origin: "https://homiee-eight.vercel.app",
+    credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 
