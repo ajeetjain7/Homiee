@@ -55,7 +55,7 @@ const FindTeammates = ({ currentUser }) => {
         psCode: selectedPsCode === 'All PS Codes' ? '' : selectedPsCode
       });
 
-      const res = await axios.get(`${VITE_API_URL}/api/auth/teammates?${queryParams.toString()}`);
+      const res = await axios.get(`${API_BASE}/api/auth/teammates?${queryParams.toString()}`);
       const fetchedList = Array.isArray(res.data) ? res.data : [];
       setCandidates(fetchedList);
     } catch (err) {
