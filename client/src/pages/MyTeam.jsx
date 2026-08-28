@@ -52,7 +52,7 @@ const MyTeam = ({ currentUser }) => {
       let fetchedTeams = [];
 
       try {
-        const res = await axios.get(`${VITE_API_URL}/api/teams/team`, config);
+        const res = await axios.get(`${API_BASE}/api/teams/team`, config);
         if (res.data?.teams && Array.isArray(res.data.teams) && res.data.teams.length > 0) {
           fetchedTeams = res.data.teams;
         } else if (res.data?.team) {
