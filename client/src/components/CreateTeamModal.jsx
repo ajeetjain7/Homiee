@@ -89,7 +89,7 @@ const CreateTeamModal = ({ isOpen, onClose, onSuccess }) => {
         email: localUser.email || ''
       };
 
-      const res = await axios.post(`${API_BASE}/api/teams/create`, payload, config);
+      const res = await axios.post(`${VITE_API_URL}/api/teams/create`, payload, config);
 
       toast.success('🎉 SIH Squad created successfully!');
       onClose();
