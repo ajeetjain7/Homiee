@@ -66,7 +66,7 @@ const CreateTeam = () => {
       const token = localStorage.getItem('token');
       const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
-      await axios.post(`${API_BASE}/api/teams/create`, {
+      await axios.post(`${VITE_API_URL}/api/teams/create`, {
         ...form,
         vacancies,
         criticalSkills,
