@@ -14,18 +14,20 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Homiee" />
     <meta name="description" content="Find verified teammates, build winning squads, and collaborate in real-time for SIH 2026 and hackathons." />
+
+    <!-- Unregister Service Worker to prevent Edge & cache crashes -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+    </script>
   </head>
   <body class="bg-[#050A14] text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((err) => {
-            console.log('SW registration error:', err);
-          });
-        });
-      }
-    </script>
   </body>
 </html>
