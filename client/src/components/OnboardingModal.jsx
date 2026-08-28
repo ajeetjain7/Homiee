@@ -241,7 +241,7 @@ const OnboardingModal = ({ user, onComplete }) => {
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. Shivam Purohit"
+                    placeholder="e.g. Enter Your Name"
                     className="w-full bg-[#070D18] border border-gray-700 focus:border-[#F59E0B] rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all"
                   />
                 </div>
