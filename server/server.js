@@ -27,7 +27,7 @@ app.set('trust proxy', 1);
 // Initialize Socket.io with secure CORS
 const io = new Server(server, {
     cors: {
-        origin: "https://homiee-eight.vercel.app",
+        origin: "https://homiee-ajnj.vercel.app",
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         credentials: true
     },
@@ -38,7 +38,7 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors({
-    origin: "https://homiee-eight.vercel.app",
+    origin: "https://homiee-ajnj.vercel.app",
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
