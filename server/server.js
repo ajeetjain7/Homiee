@@ -38,8 +38,18 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors({
-    origin: "https://homiee-ajnj.vercel.app",
-    credentials: true
+  origin: function (origin, callback) {
+    // Allow server-to-server requests or local Postman testing
+    if (!origin) return callback(null, true);
+
+    // Allow local development and any .vercel.app domain
+    if (origin.includes("localhost") || /\.vercel\.app$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 
