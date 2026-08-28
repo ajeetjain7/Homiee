@@ -174,6 +174,7 @@ const LandingPage = () => {
       {/* Footer */}
       <footer className="relative z-10 bg-[#040810] text-[#94A3B8] py-6 px-6 border-t border-[#1E293B] text-xs flex flex-col sm:flex-row justify-between items-center gap-4 font-mono">
         <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Homiee" className="w-6 h-6 object-contain rounded-lg" />
           <span className="font-bold text-white text-sm">Homiee SIH</span>
           <span className="text-[10px] bg-[#0F172A] border border-[#1E293B] text-[#CBD5E1] px-2 py-0.5 rounded">2026 Edition</span>
         </div>

@@ -60,9 +60,11 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
       <header className="bg-[#050A14] border-b border-[#1E293B] px-6 py-3.5 flex items-center justify-between sticky top-0 z-40 backdrop-blur-xl">
         {/* Left Logo */}
         <Link to="/" className="flex items-center gap-3 cursor-pointer group">
-          <div className="w-8 h-8 rounded-xl bg-[#F59E0B] text-[#000000] font-black flex items-center justify-center text-lg shadow-lg shadow-amber-500/10 group-hover:scale-105 transition-transform">
-            ⚡
-          </div>
+          <img 
+            src="/logo.png" 
+            alt="Homiee Logo" 
+            className="w-9 h-9 object-contain rounded-xl shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform" 
+          />
           <div className="flex flex-col text-left">
             <span className="font-extrabold text-base text-white tracking-tight leading-none">
               Homiee <span className="text-[9px] bg-[#261E0C] border border-[#785412] text-[#FBBF24] px-1 py-0.2 rounded font-mono font-bold uppercase ml-1">SIH</span>

@@ -922,7 +922,11 @@ const Dashboard = () => {
         <aside className="w-20 lg:w-48 bg-[#0D1021] border-r border-gray-800/80 p-4 flex flex-col justify-between">
           <div className="space-y-6">
             <div className="flex items-center gap-3 px-2">
-              <div className="w-8 h-8 rounded-xl bg-amber-500 text-black font-extrabold flex items-center justify-center text-lg">⚡</div>
+              <img 
+                src="/logo.png" 
+                alt="Homiee Logo" 
+                className="w-8 h-8 object-contain rounded-xl shadow-md shadow-purple-500/20" 
+              />
               <span className="font-bold text-lg hidden lg:inline">Homiee</span>
             </div>
 

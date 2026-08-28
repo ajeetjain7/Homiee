@@ -156,9 +156,11 @@ const Login = () => {
               {/* Card Header */}
               <div className="flex items-center justify-between pb-4 border-b border-[#1E293B]">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-[#F59E0B] text-black font-black flex items-center justify-center text-xl shadow-lg shadow-amber-500/10">
-                    ⚡
-                  </div>
+                  <img 
+                    src="/logo.png" 
+                    alt="Homiee Logo" 
+                    className="w-10 h-10 object-contain rounded-xl shadow-lg shadow-purple-500/20" 
+                  />
                   <span className="font-extrabold text-xl text-white">
                     Homiee <span className="text-[10px] bg-[#261E0C] border border-[#785412] text-[#FBBF24] px-1.5 py-0.5 rounded font-mono font-bold uppercase ml-1">SIH</span>
                   </span>
