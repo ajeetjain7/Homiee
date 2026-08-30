@@ -101,6 +101,12 @@ const Navbar = ({ user: propUser, onOpenSetup }) => {
               Requests
             </NavLink>
           )}
+            <NavLink 
+            to="/winners" 
+            className={({ isActive }) => isActive ? 'text-[#FBBF24] font-bold border-b-2 border-[#FBBF24] pb-1' : 'text-[#CBD5E1] hover:text-white transition-colors'}
+          >
+            SIH PPTs
+          </NavLink>
         </nav>
 
         {/* Right User Bar / Login-Signup Buttons */}
