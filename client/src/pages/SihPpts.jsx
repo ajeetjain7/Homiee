@@ -63,43 +63,15 @@ const SIH_PPTS_DATA = [
 
 const SihPpts = () => {
   const handleDownload = (entry) => {
-    const filename = `${entry.teamName}.pptx`;
-    
-    // Generate a presentation document containing the full pitch deck content
-    const presentationContent = `SMART INDIA HACKATHON PRESENTATION
-=====================================================
-Team: ${entry.teamName}
-Theme: ${entry.sihTheme}
-Year: ${entry.year}
-Problem Statement: ${entry.psCode} - ${entry.problemStatementTitle}
-=====================================================
     const filename = `${entry.teamName}.pdf`;
     const fileUrl = `/ppts/${encodeURIComponent(entry.teamName)}.pdf`;
 
-OVERVIEW & SOLUTION:
-${entry.description}
-
-TECHNICAL & SYSTEM HIGHLIGHTS:
-${entry.summaryText}
-
-Smart India Hackathon Winning Pitch Deck
-Homiee - College Team Formation Platform
-`;
-
-    const blob = new Blob([presentationContent], {
-      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation;charset=utf-8'
-    });
-
-    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
     link.href = fileUrl;
     link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
 
     toast.success(`Downloading ${filename}`);
   };
@@ -113,7 +85,7 @@ Homiee - College Team Formation Platform
             {entry.teamName}
           </h2>
 
-          {/* Subheading / Tag Line: Theme · Year */}
+          {/* Subheading / Tag Line: Theme · Year · PS Code */}
           <div className="text-xs sm:text-sm font-mono text-[#FBBF24] font-medium tracking-wide flex items-center gap-2 flex-wrap">
             <span>{entry.sihTheme}</span>
             <span className="text-[#64748B]">·</span>
@@ -133,7 +105,7 @@ Homiee - College Team Formation Platform
             </p>
           )}
 
-          {/* Description of Problem Statement & Solution */}
+          {/* Description */}
           <p className="text-sm sm:text-base text-[#CBD5E1] leading-relaxed whitespace-pre-line font-normal">
             {entry.description}
           </p>
@@ -143,14 +115,13 @@ Homiee - College Team Formation Platform
             {entry.summaryText}
           </div>
 
-          {/* Download PPT Button */}
+          {/* Download Button */}
           <div className="pt-2">
             <button
               onClick={() => handleDownload(entry)}
               className="inline-flex items-center gap-2 bg-[#F59E0B] hover:bg-[#E08D00] text-black font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-amber-500/10 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
             >
               <span>📥</span>
-              <span>Download PPT</span>
               <span>Download PPT (PDF)</span>
             </button>
           </div>
@@ -166,4 +137,3 @@ Homiee - College Team Formation Platform
 };
 
 export default SihPpts;
-
