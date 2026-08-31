@@ -31,34 +31,8 @@ const SIH_PPTS_DATA = [
 • AI-Powered Personalization: Adapts questions dynamically based on individual candidate performance and learning gaps.
 • Real-Time Proctored Analytics: Automated eye-tracking and audio analysis with instant feedback for educators.`
   },
-  {
-    id: 'sih-cattle-coders',
-    teamName: 'Cattle-Coders (JeevSarthi)',
-    sihTheme: 'Agriculture, FoodTech & Rural Development',
-    year: 2025,
-    psCode: 'SIH 25007',
-    problemStatementTitle: 'Development of a Digital Farm Management Portal for Monitoring Maximum Residue Limits (MRL) and Antimicrobial Usage (AMU) in Livestock (JeevSarthi)',
-    description: `JeevSarthi is an AI-enabled livestock digital platform that monitors Antimicrobial Usage (AMU) and Maximum Residue Limits (MRL) to ensure food safety and prevent antibiotic resistance. It unites farmers, veterinarians, and testing labs on a single cloud and mobile-friendly system with automated drug withdrawal period calculators and digital Pashu Swasthya health cards.`,
-    summaryText: `Innovative Livestock Management Solution:
-• Unified Digital Ecosystem: Seamless coordination between farmers, PashuMitras, veterinary clinics, and testing labs.
-• Automated Risk Detection: Real-time calculation of AMU values generating instant warnings on safety breaches.
-• Pashu Swasthya Health Card: Digital animal passport storing vaccination history and drug administration logs.
-• Offline-First Mobile Access: Tailored for rural adoption with multilingual voice support and barcode drug scanners.`
-  },
-  {
-    id: 'sih-imaginary-coders',
-    teamName: 'Imaginary_coders (KrashiBandhu)',
-    sihTheme: 'Agriculture, FoodTech & Rural Development',
-    year: 2025,
-    psCode: 'SIH25262',
-    problemStatementTitle: 'AI based real-time crop image analytics for crop insurance - PMFBY (KrashiBandhu)',
-    description: `KrashiBandhu revolutionizes crop insurance claims under PMFBY. Using edge computer vision (CNNs and Vision Transformers), farmers capture periodic field photos to detect crop stress, disease, and yield potential. Geotagged images cross-validate with satellite NDVI imagery to eliminate middlemen, accelerate Direct Benefit Transfers (DBT), and ensure tamper-proof insurance settlements.`,
-    summaryText: `Key Solution Highlights:
-• Edge AI Diagnostics: Analyzes crop stages and pest infections on-device with offline capability.
-• Satellite & Weather Cross-Verification: Live satellite overlay (NDVI) validates claim legitimacy against natural calamities.
-• Digital PMFBY Wallet: Direct insurance claim disbursements eliminating fraud and administrative bottlenecks.
-• AR-Guided Image Capture: Prevents false or duplicate submissions through strict metadata and lighting checks.`
-  }
+  
+ 
 ];
 
 const SihPpts = () => {
