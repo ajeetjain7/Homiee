@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import SihPpts from './pages/SihPpts';
 
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
@@ -178,8 +179,19 @@ function App() {
             </ProtectedRoute>
           } 
         />
+        <Route 
+  path="/sih-ppts" 
+  element={
+    <ProtectedRoute>
+      <AppLayout>
+        <SihPpts />
+      </AppLayout>
+    </ProtectedRoute>
+  } 
+/>
 
         {/* Route Aliases for Seamless Navigation */}
+        <Route path="/winners" element={<Navigate to="/sih-ppts" replace />} />
         <Route path="/my-team" element={<Navigate to="/team" replace />} />
         <Route path="/form-team" element={<Navigate to="/team" replace />} />
         <Route path="/dashboard/my-team" element={<Navigate to="/team" replace />} />
